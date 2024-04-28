@@ -13,29 +13,28 @@ public func byteToString(_ data: UInt32, withSize size: Int) -> String {
     return NSString(bytes: &string, length: size, encoding: NSUTF8StringEncoding)! as String
 }
 
-struct ReadOffset {
-    var offset: Int
-    let blockSize: Int
+public func maybeByteToArray<T: BinaryInteger>(_ bytes: Data, ofType: T.Type, length: Int) -> [T?] {
+    let read: ReadHead = ReadHead(bytes, index: 0)
     
-    init(startAt value: Int, withBlockSize blockSize: Int) {
-        self.offset = value
-        self.blockSize = blockSize
+    return Array(repeating: 0, count: length).map { _ in
+        return read.value(ofType: ofType)
     }
     
-    mutating func advance(by sumOffset: Int) {
-        self.offset += sumOffset;
+}
+
+public func byteToArray<T: BinaryInteger>(_ bytes: Data, ofType: T.Type, length: Int) -> ([T], Int) {
+    let read: ReadHead = ReadHead(bytes, index: 0)
+    
+    let arrayFromByte = Array(repeating: 0, count: length).map { _ in
+        return read.value(ofType: ofType)!
     }
     
-    mutating func recue(by decreaseOffset: Int) {
-        self.advance(by: decreaseOffset * -1)
-    }
-    
-    mutating func next() {
-        self.advance(by: blockSize)
-    }
-    
-    mutating func previous() {
-        self.recue(by: blockSize)
+    return (arrayFromByte, read.index)
+}
+
+extension UInt8 {
+    func isBitSet(at bitIndex: Int) -> Bool {
+        return ((self >> bitIndex) & 1) == 1
     }
 }
 

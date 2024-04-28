@@ -1,12 +1,9 @@
 //
-//  Tables.swift
+//  TableNames.swift
 //
 //
 //  Created by Jefferson Oliveira on 4/20/24.
 //
-
-
-
 
 import Foundation
 

@@ -14,13 +14,17 @@ public struct Subtable {
     let entrySelector: UInt16
     let rangeShift: UInt16
     
+    let tableLength: Int
     
     init(bytes: Data) {
-        scalerType = bytes.value(ofType: UInt32.self, at: 0)!
-        numTables = bytes.value(ofType: UInt16.self, at: 4)!
-        searchRange = bytes.value(ofType: UInt16.self, at: 8)!
-        entrySelector = bytes.value(ofType: UInt16.self, at: 12)!
-        rangeShift = bytes.value(ofType: UInt16.self, at: 16)!
+        let read = ReadHead(bytes, index: 0)
+        
+        scalerType = read.value(ofType: UInt32.self)!
+        numTables = read.value(ofType: UInt16.self)!
+        searchRange = read.value(ofType: UInt16.self)!
+        entrySelector = read.value(ofType: UInt16.self)!
+        rangeShift = read.value(ofType: UInt16.self)!
+        tableLength = read.index
     }
 }
 
@@ -29,12 +33,16 @@ public struct TableDirectory {
     let checkSum: UInt32
     let offset: UInt32
     let length: UInt32
+    let tableLength: Int
     
     init(bytes: Data) {
-        tag = byteToString(bytes.value(ofType: UInt32.self, at: 0, convertEndian: true)!, withSize: 4)
-        checkSum = bytes.value(ofType: UInt32.self, at: 4)!
-        offset = bytes.value(ofType: UInt32.self, at: 8)!
-        length = bytes.value(ofType: UInt32.self, at: 12)!
+        let read: ReadHead = ReadHead(bytes, index: 0)
+        
+        tag = byteToString(read.value(ofType: UInt32.self, convertEndian: true)!, withSize: 4)
+        checkSum = read.value(ofType: UInt32.self)!
+        offset = read.value(ofType: UInt32.self)!
+        length = read.value(ofType: UInt32.self)!
+        tableLength = read.index
     }
 }
 
@@ -57,7 +65,7 @@ public class FontWithRequiredTables {
         }
     }
     
-    /** 
+    /**
      Character to glyph mapping
      https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6cmap.html
      */
