@@ -12,7 +12,6 @@ import Foundation
 //}
 
 public struct LocaTable<T: BinaryInteger> {
-    public typealias T = UInt16
     let indexes: [T]
     
     let tableLength: Int
@@ -36,6 +35,22 @@ public struct LocaTable<T: BinaryInteger> {
         }
     }
     
+}
+
+extension LocaTable where T == UInt16 {
+    init(bytes: Data, withSize length: Int) {
+        let read: ReadHead = ReadHead(bytes, index: 0)
+        indexes = read.values(ofType: T.self, withSize: length).map { $0 }
+        
+        tableLength = read.index
+    }
+}
+
+extension LocaTable where T == UInt32 {
+    init(from origin: LocaTable<UInt16>) {
+        self.indexes = origin.indexes.map { UInt32($0) * 2 }
+        self.tableLength = origin.tableLength * 2
+    }
 }
 
 public typealias LocaTableLong = LocaTable<UInt32>

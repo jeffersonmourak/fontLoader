@@ -45,11 +45,11 @@ fileprivate func handleInvalid(reason: String) {
     print("Invalid font. Reason: \(reason)")
 }
 
-public struct Glyphs<T: BinaryInteger> {
-    private let locations: LocaTable<T>
+public struct Glyphs {
+    private let locations: [Int]
     private let bytes: Data
     
-    init(_ bytes: Data,_ locations: LocaTable<T>) {
+    init(_ bytes: Data,_ locations: [Int]) {
         self.locations = locations
         self.bytes = bytes
     }
@@ -74,7 +74,7 @@ public struct Glyphs<T: BinaryInteger> {
 public class FontLoader: FontWithRequiredTables {
     private let data: Data
     
-    public init(withData data: Data) {
+    public init(withData data: Data) throws {
         self.data = data
         let subTable = Subtable(bytes: data)
         
@@ -83,7 +83,7 @@ public class FontLoader: FontWithRequiredTables {
         do {
             directory = try loadTableDir(fromData:data, usingSubtable: subTable)
         } catch {
-            handleInvalid(reason: error.localizedDescription)
+            throw error
         }
     
         super.init(subTable: subTable, directory: directory)
@@ -91,72 +91,26 @@ public class FontLoader: FontWithRequiredTables {
 //        cmapLookup()
     }
     
-    public var glyphs: Glyphs<UInt32> {
+    public var glyphs: Glyphs {
         get {
+            let head = HeadTable(bytes: data.advanced(by: Int(head.offset)))
             let maxp = MaxpTable(bytes: data.advanced(by: Int(maxp.offset)))
-            let locations = LocaTable<UInt32>(bytes: data.advanced(by: Int(loca.offset)), withSize: Int(maxp.numGlyphs))
             
-            let bytes = data.advanced(by: Int(glyf.offset))
-            let glyphs = Glyphs(bytes, locations)
-            
-            return glyphs
-        }
-    }
-    
-    /**
-        Check out https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6glyf.html
-     */
-    public func getGlyph() {
-        let maxp = MaxpTable(bytes: data.advanced(by: Int(maxp.offset)))
-        let locations = LocaTableLong(bytes: data.advanced(by: Int(loca.offset)), withSize: Int(maxp.numGlyphs))
-        
-        for offset in locations.indexes {
-            let totalOffset = Int(glyf.offset) + Int(offset)
-            let bytes = data.advanced(by: Int(glyf.offset) + Int(offset))
-//            print("\(glyf.offset) | \(offset) | \(totalOffset) > 0x\(String(totalOffset, radix: 16).uppercased())")
-            
-            do {
-                let simpleGlyph = try SimpleGlyphTable(bytes)
+            if (head.indexToLocFormat == 1) {
+                let locations = LocaTable<UInt32>(bytes: data.advanced(by: Int(loca.offset)), withSize: Int(maxp.numGlyphs)).indexes.map { Int($0) }
                 
-                if (simpleGlyph == nil) {
-//                    print("Compound Glyph at:")
-    //                print(Int(glyf.offset))
-    //                print(Int(offset))
-    //                print("\(glyf.offset) | \(offset) | \(totalOffset) > 0x\(String(totalOffset, radix: 16).uppercased())")
-                    
-                    continue
-                }
-//                print(simpleGlyph)
-            } catch {
-//                print(error)
+                let bytes = data.advanced(by: Int(glyf.offset))
+                let glyphs = Glyphs(bytes, locations)
+                
+                return glyphs
+            } else {
+                let locations = LocaTable<UInt16>(bytes: data.advanced(by: Int(loca.offset)), withSize: Int(maxp.numGlyphs)).indexes.map { Int($0) }
+                let bytes = data.advanced(by: Int(glyf.offset))
+                let glyphs = Glyphs(bytes, locations)
+                
+                return glyphs
             }
-            
-            
         }
-        
-//        let offset = locations.indexes[0]
-
-        
-        
-        
-
-        
-//        var glyphData = GlyphData(bytes: bytes)
-//        bytes = bytes.advanced(by: glyphData.tableLength)
-//        
-//        let length = Int(glyphData.numberOfContours)
-//        
-//        let contoursEndIndices = Array(repeating: 0, count: length).map { index in
-//            let countourData = bytes.value(ofType: UInt16.self, at: 0)
-//            bytes = bytes.advanced(by: 2)
-//            
-//            return Int(countourData!)
-//        }
-//        let numOfPoints = contoursEndIndices.last! + 1
-
-//        print(contoursEndIndices)
-        
-//        let allFlags: [UInt8] = Array(repeating: 0x0, count: length)
     }
     
     func cmapLookup () {
