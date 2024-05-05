@@ -56,11 +56,20 @@ public struct Glyphs {
     
     public subscript(index: Int) -> SimpleGlyphTable? {
         get {
-            return try? SimpleGlyphTable(
-                bytes.advanced(
-                    by: Int(locations[index])
-                )
-            )
+            let glyphBytes =  bytes.advanced(by: Int(locations[index]))
+            
+            do {
+                switch  try GlyfTable(glyphBytes) {
+                case let .simple(glyph):
+                    return glyph
+                case let .compound(compoundGlyph):
+                    
+                    let glyphBytes = bytes.advanced(by: Int(locations[Int(compoundGlyph.glyphs[0].glyphIndex)]))
+                    return try SimpleGlyphTable(glyphBytes)
+                }
+            } catch {
+                return nil
+            }
         }
     }
     
@@ -74,6 +83,8 @@ public struct Glyphs {
 public class FontLoader: FontWithRequiredTables {
     private let data: Data
     
+    public var characters: [Character : CharacterMapItem] = [:]
+    
     public init(withData data: Data) throws {
         self.data = data
         let subTable = Subtable(bytes: data)
@@ -85,10 +96,13 @@ public class FontLoader: FontWithRequiredTables {
         } catch {
             throw error
         }
-    
+        
+        
         super.init(subTable: subTable, directory: directory)
         
-//        cmapLookup()
+        
+        characters = cmapLookup()
+        
     }
     
     public var glyphs: Glyphs {
@@ -98,13 +112,12 @@ public class FontLoader: FontWithRequiredTables {
             
             if (head.indexToLocFormat == 1) {
                 let locations = LocaTable<UInt32>(bytes: data.advanced(by: Int(loca.offset)), withSize: Int(maxp.numGlyphs)).indexes.map { Int($0) }
-                
                 let bytes = data.advanced(by: Int(glyf.offset))
                 let glyphs = Glyphs(bytes, locations)
                 
                 return glyphs
             } else {
-                let locations = LocaTable<UInt16>(bytes: data.advanced(by: Int(loca.offset)), withSize: Int(maxp.numGlyphs)).indexes.map { Int($0) }
+                let locations = LocaTable<UInt16>(bytes: data.advanced(by: Int(loca.offset)), withSize: Int(maxp.numGlyphs)).indexes.map { Int($0) * 2 }
                 let bytes = data.advanced(by: Int(glyf.offset))
                 let glyphs = Glyphs(bytes, locations)
                 
@@ -113,20 +126,38 @@ public class FontLoader: FontWithRequiredTables {
         }
     }
     
-    func cmapLookup () {
+    func cmapLookup () -> [Character : CharacterMapItem] {
         let initialOffset = Int(self.cmap.offset)
+        let bytes = data.advanced(by: initialOffset)
+        let subTables = CmapTable(bytes: bytes).subTables
         
-        var bytes = data.advanced(by: initialOffset)
+        var cmapSubtableOffset = 0
+        var selectedUnicode = -1
         
-        var version = bytes.value(ofType: Int16.self, at: 0)
-        var numOfTables = bytes.value(ofType: Int16.self, at: 2)
+        for subTable in subTables {
+            if subTable.platformId == .Unicode {
+                let platformSpecificId = Int(subTable.platformSpecificID)
+                if platformSpecificId != 2 && platformSpecificId <= 4 && platformSpecificId > selectedUnicode {
+                    cmapSubtableOffset = Int(subTable.offset)
+                    selectedUnicode = platformSpecificId
+                }
+            } else if subTable.platformId == .Microsoft && selectedUnicode == -1 {
+                if subTable.platformSpecificID == 1 || subTable.platformSpecificID == 10 {
+                    cmapSubtableOffset = Int(subTable.offset)
+                }
+            }
+        }
         
-//        print(version, numOfTables)
+        let format = bytes.value(ofType: UInt16.self, at: cmapSubtableOffset)!
+                
+        if format == 4 {
+            return CmapTableFormat4(bytes: data, cmapStartOffset: initialOffset + cmapSubtableOffset).toCharacterMap()
+        }
         
-//        let version =
+        if format == 12 {
+            return CmapTableFormat12(bytes: bytes.advanced(by: cmapSubtableOffset)).toCharacterMap()
+        }
         
-        
-        
-//        var cmapReadOffset = ReadOffset(startAt: <#T##Int#>, withBlockSize: <#T##Int#>)
+        return [:]
     }
 }

@@ -38,6 +38,12 @@ extension UInt8 {
     }
 }
 
+extension UInt16 {
+    func isBitSet(at bitIndex: Int) -> Bool {
+        return ((self >> bitIndex) & 1) == 1
+    }
+}
+
 
 extension Data {
     subscript<T: BinaryInteger>(at offset: Int, convertEndian convertEndian: Bool = false) -> T? {

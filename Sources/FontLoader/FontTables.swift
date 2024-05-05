@@ -47,8 +47,8 @@ public struct TableDirectory {
 }
 
 public class FontWithRequiredTables {
-    internal let subTable: Subtable
-    internal let directory: [TableDirectory]
+    public let subTable: Subtable
+    public let directory: [TableDirectory]
     
     private var dirMap: [String: TableDirectory] = [:]
     
