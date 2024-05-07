@@ -11,13 +11,15 @@ import Foundation
 public enum GlyfTable {
     init(_ bytes: Data) throws {
         do {
-            self = .simple(try SimpleGlyphTable(bytes))
-        } catch {
-            do {
+            let contoursCount = bytes.value(ofType: Int16.self, at: 0)!
+            
+            if contoursCount < 0 {
                 self = .compound(try CompoundGlyphTable(bytes))
-            } catch {
-                throw error
+            } else {
+                self = .simple(try SimpleGlyphTable(bytes))
             }
+        } catch {
+            throw error
         }
     }
     case simple(SimpleGlyphTable)

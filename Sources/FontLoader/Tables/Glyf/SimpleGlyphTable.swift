@@ -66,10 +66,10 @@ public struct SimpleGlyphTableComputed {
 public struct SimpleGlyphTable: Identifiable, Equatable {
     public let id: UUID = UUID()
     public let numberOfContours: Int16
-    public let xMin: UInt16
-    public let yMin: UInt16
-    public let xMax: UInt16
-    public let yMax: UInt16
+    public let xMin: Int16
+    public let yMin: Int16
+    public let xMax: Int16
+    public let yMax: Int16
     public let endPtsOfContours: [Int]
     public let instructionLength: Int16
     public let instructions: [UInt8]
@@ -90,10 +90,10 @@ public struct SimpleGlyphTable: Identifiable, Equatable {
             throw GlyphValidationError("Expected Simple Glyph Data but received a Compound Glyph insted")
         }
         
-        xMin = read.value(ofType: UInt16.self)!
-        yMin = read.value(ofType: UInt16.self)!
-        xMax = read.value(ofType: UInt16.self)!
-        yMax = read.value(ofType: UInt16.self)!
+        xMin = read.value(ofType: Int16.self)!
+        yMin = read.value(ofType: Int16.self)!
+        xMax = read.value(ofType: Int16.self)!
+        yMax = read.value(ofType: Int16.self)!
         
         var endPtsOfContours = Array(repeating: 0, count: Int(contoursCount))
         

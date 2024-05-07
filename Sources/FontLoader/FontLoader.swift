@@ -45,41 +45,6 @@ fileprivate func handleInvalid(reason: String) {
     print("Invalid font. Reason: \(reason)")
 }
 
-public struct Glyphs {
-    private let locations: [Int]
-    private let bytes: Data
-    
-    init(_ bytes: Data,_ locations: [Int]) {
-        self.locations = locations
-        self.bytes = bytes
-    }
-    
-    public subscript(index: Int) -> SimpleGlyphTable? {
-        get {
-            let glyphBytes =  bytes.advanced(by: Int(locations[index]))
-            
-            do {
-                switch  try GlyfTable(glyphBytes) {
-                case let .simple(glyph):
-                    return glyph
-                case let .compound(compoundGlyph):
-                    
-                    let glyphBytes = bytes.advanced(by: Int(locations[Int(compoundGlyph.glyphs[0].glyphIndex)]))
-                    return try SimpleGlyphTable(glyphBytes)
-                }
-            } catch {
-                return nil
-            }
-        }
-    }
-    
-    public var count: Int {
-        get {
-            return locations.count
-        }
-    }
-}
-
 public class FontLoader: FontWithRequiredTables {
     private let data: Data
     
@@ -105,25 +70,64 @@ public class FontLoader: FontWithRequiredTables {
         
     }
     
-    public var glyphs: Glyphs {
+    public var horizontalHeader: HheaTable {
         get {
-            let head = HeadTable(bytes: data.advanced(by: Int(head.offset)))
-            let maxp = MaxpTable(bytes: data.advanced(by: Int(maxp.offset)))
+            let hhea = HheaTable(bytes: data.advanced(by: Int(hhea.offset) + 2))
             
-            if (head.indexToLocFormat == 1) {
-                let locations = LocaTable<UInt32>(bytes: data.advanced(by: Int(loca.offset)), withSize: Int(maxp.numGlyphs)).indexes.map { Int($0) }
-                let bytes = data.advanced(by: Int(glyf.offset))
-                let glyphs = Glyphs(bytes, locations)
-                
-                return glyphs
+            return hhea;
+        }
+    }
+    
+    public var horizontalMetrics: HmtxTable {
+        get {
+            let hmtx = HmtxTable(bytes: data.advanced(by: Int(hmtx.offset)), numOfLongHorMetrics: Int(horizontalHeader.numOfLongHorMetrics), numOfGlyphs: Int(memoryInfo.numGlyphs))
+            
+            return hmtx;
+        }
+    }
+    
+    public var fontInfo: HeadTable {
+        get {
+            return HeadTable(bytes: data.advanced(by: Int(head.offset)))
+        }
+    }
+    
+    public var memoryInfo: MaxpTable {
+        get {
+            return MaxpTable(bytes: data.advanced(by: Int(maxp.offset)));
+        }
+    }
+    
+    public var glyphLocations: [Int] {
+        get {
+            if (fontInfo.indexToLocFormat == 1) {
+                return LocaTable<UInt32>(bytes: data.advanced(by: Int(loca.offset)), withSize: Int(memoryInfo.numGlyphs)).indexes.map { Int($0) }
             } else {
-                let locations = LocaTable<UInt16>(bytes: data.advanced(by: Int(loca.offset)), withSize: Int(maxp.numGlyphs)).indexes.map { Int($0) * 2 }
-                let bytes = data.advanced(by: Int(glyf.offset))
-                let glyphs = Glyphs(bytes, locations)
-                
-                return glyphs
+               return LocaTable<UInt16>(bytes: data.advanced(by: Int(loca.offset)), withSize: Int(memoryInfo.numGlyphs)).indexes.map { Int($0) * 2 }
             }
         }
+    }
+    
+    public func getGlyphTableOrMissing(at index: Int) -> (Int, GlyfTable) {
+        let targetIndex = Int(glyf.offset) + Int(glyphLocations[index])
+        let bytes = data.advanced(by: Int(glyf.offset))
+        
+        guard let glyphData = try? GlyfTable(data.advanced(by: targetIndex)) else {
+            return (0, try! GlyfTable(bytes))
+        }
+        
+        return (index, glyphData)
+    }
+    
+    public func getGlyphContours(at index: Int) -> Glyph {
+        let bytes = data.advanced(by: Int(glyf.offset))
+        let fontBoundaries = (CGPoint(x: Double(fontInfo.xMin), y: Double(fontInfo.yMin)), (CGPoint(x: Double(fontInfo.xMax), y: Double(fontInfo.yMax))))
+        
+        let (resolvedIndex, glyphData) = getGlyphTableOrMissing(at: index)
+        
+        let glyphLayout: GlyphLayout = .init(fontBoundaries: fontBoundaries, horizontalMetrics: horizontalMetrics.hMetrics[resolvedIndex])
+
+        return Glyph(glyphData, using: bytes, withLocation: glyphLocations, layout: glyphLayout)
     }
     
     func cmapLookup () -> [Character : CharacterMapItem] {

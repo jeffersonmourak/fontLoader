@@ -7,6 +7,13 @@
 
 import Foundation
 
+public typealias shortFrac = Int16
+public typealias Fixed = Int16
+public typealias FWord = Int16
+public typealias uFWord = UInt16
+public typealias F2Dot14 = Int16
+public typealias longDateTime = Int64
+
 public func byteToString(_ data: UInt32, withSize size: Int) -> String {
     var string = data
     

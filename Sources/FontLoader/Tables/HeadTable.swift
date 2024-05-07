@@ -8,25 +8,25 @@
 import Foundation
 
 public struct HeadTable {
-    let version: UInt32
-    let fontRevision: UInt32
-    let checkSumAdjustment: UInt32
-    let magicNumber: UInt32
-    let flags: UInt16
-    let unitsPerEm: UInt16
-    let created: UInt64
-    let modified: UInt64
-    let xMin: UInt16
-    let yMin: UInt16
-    let xMax: UInt16
-    let yMax: UInt16
-    let macStyle: UInt16
-    let lowestRecPPEM: UInt16
-    let fontDirectionHint: Int16
-    let indexToLocFormat: Int16
-    let glyphDataFormat: Int16
+    public let version: UInt32
+    public let fontRevision: UInt32
+    public let checkSumAdjustment: UInt32
+    public let magicNumber: UInt32
+    public let flags: UInt16
+    public let unitsPerEm: UInt16
+    public let created: UInt64
+    public let modified: UInt64
+    public let xMin: Int16
+    public let yMin: Int16
+    public let xMax: Int16
+    public let yMax: Int16
+    public let macStyle: UInt16
+    public let lowestRecPPEM: UInt16
+    public let fontDirectionHint: Int16
+    public let indexToLocFormat: Int16
+    public let glyphDataFormat: Int16
     
-    let tableLength: Int
+    public let tableLength: Int
     
     init(bytes: Data) {
         let read: ReadHead = ReadHead(bytes, index: 0)
@@ -39,10 +39,10 @@ public struct HeadTable {
         unitsPerEm = read.value(ofType: UInt16.self)!
         created = read.value(ofType: UInt64.self)!
         modified = read.value(ofType: UInt64.self)!
-        xMin = read.value(ofType: UInt16.self)!
-        yMin = read.value(ofType: UInt16.self)!
-        xMax = read.value(ofType: UInt16.self)!
-        yMax = read.value(ofType: UInt16.self)!
+        xMin = read.value(ofType: Int16.self)!
+        yMin = read.value(ofType: Int16.self)!
+        xMax = read.value(ofType: Int16.self)!
+        yMax = read.value(ofType: Int16.self)!
         macStyle = read.value(ofType: UInt16.self)!
         lowestRecPPEM = read.value(ofType: UInt16.self)!
         fontDirectionHint = read.value(ofType: Int16.self)!

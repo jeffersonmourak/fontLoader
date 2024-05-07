@@ -1,15 +1,11 @@
 //
-//  HeadTable.swift
+//  LocaTable.swift
 //
 //
 //  Created by Jefferson Oliveira on 4/27/24.
 //
 
 import Foundation
-
-//public protocol LocaTable {
-//    associatedtype T: BinaryInteger
-//}
 
 public struct LocaTable<T: BinaryInteger> {
     let indexes: [T]
