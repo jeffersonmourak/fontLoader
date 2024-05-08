@@ -13,63 +13,88 @@ public struct GlyphLayout {
     public let horizontalMetrics: LongHorMetric
 }
 
-public struct GlyphContours {
-    public let points: [CGPoint]
-    public let boundaries: (CGPoint, CGPoint)
-    public let glyphBox: (CGPoint, CGPoint)
+func getGlyphMagntude(_ glyph: SimpleGlyphTable) -> (Int16, Int16) {
+    return (glyph.xMax - glyph.xMin, glyph.yMax - glyph.yMin)
 }
 
-func getBoxPointsData(glyph: SimpleGlyphTable, layout: GlyphLayout) -> GlyphContours{
-    var coords: [CGPoint] = []
-    
-    let xMagnitude = abs(Double(glyph.xMin)) + Double(glyph.xMax)
-    let yMagnitude = abs(Double(glyph.yMin)) + Double(glyph.yMax)
-    
-    let advanceWidth = Double(layout.horizontalMetrics.advanceWidth)
-    
-    let glyphBoxMin = CGPoint(x: Double(glyph.xMin), y: Double(glyph.yMin))
-    let glyphBoxMax = CGPoint(x: advanceWidth, y: yMagnitude)
+func buildGlyphPoints(from glyphs: [SimpleGlyphTable], layout: GlyphLayout) -> (Area<Int16>, [[Point<Int>]], Int){
+    guard glyphs.count > 0 else {
+        return (.zero, [], 0)
+    }
 
-    for i in 0..<glyph.xCoordinates.count {
-        let x = Double(glyph.xCoordinates[i])
-        let y = yMagnitude - Double(glyph.yCoordinates[i])
+    var coords: [Point<Int>] = []
+    var contoursList: [[Point<Int>]] = []
+    var baseLineDistance = 0
+    
+    let (initialXMagnitude, initialYMagnitude) = getGlyphMagntude(glyphs[0])
+    
+    var totalGlyphArea = Area(
+        begin: .init(x: glyphs[0].xMin, y: glyphs[0].yMin),
+        end: .init(x: initialXMagnitude, y: initialYMagnitude)
+    )
+    
+    for glyph in glyphs {
+        let (xMagnitude, yMagnitude) = getGlyphMagntude(glyph)
         
-        coords.append(CGPoint(x: x, y: y))
-    }
-    
-    var nextSegmentIndex = 0
-    var beginOfContour: Int = 0
-    
-    var contourPoints: [CGPoint] = [coords[0]]
-    
-    var contoursList: [[CGPoint]] = []
-    
-    for i in 1..<coords.count {
-        let current = coords[i]
-        let nextSegment = nextSegmentIndex < glyph.endPtsOfContours.count ? glyph.endPtsOfContours[nextSegmentIndex] : glyph.endPtsOfContours.last!
+        let currentGlyphArea = Area(
+            begin: .init(x: glyph.xMin, y: glyph.yMin),
+            end: .init(x: xMagnitude, y: yMagnitude)
+        )
         
-        contourPoints.append(current)
-        
-        if (i == nextSegment) {
-            contourPoints.append(coords[beginOfContour])
-            contoursList.append(contourPoints)
-            contourPoints = []
-            beginOfContour = nextSegment + 1
-            nextSegmentIndex += 1
+        totalGlyphArea = totalGlyphArea.reshape(with: currentGlyphArea)
+    
+
+        for i in 0..<glyph.xCoordinates.count {
+            let x = glyph.xCoordinates[i]
+            let y = glyph.yCoordinates[i]
+            
+            if (y < baseLineDistance) {
+                baseLineDistance = y
+            }
+            
+            coords.append(Point(x, y))
         }
+        
+        var nextSegmentIndex = 0
+        var beginOfContour: Int = 0
+        
+        var contourPoints: [Point<Int>] = [coords[0]]
+        
+        
+        for i in 1..<coords.count {
+            let current = coords[i]
+            let nextSegment = nextSegmentIndex < glyph.endPtsOfContours.count ? glyph.endPtsOfContours[nextSegmentIndex] : glyph.endPtsOfContours.last!
+            
+            contourPoints.append(current)
+            
+            if (i == nextSegment) {
+                contourPoints.append(coords[beginOfContour])
+                contoursList.append(contourPoints)
+                contourPoints = []
+                beginOfContour = nextSegment + 1
+                nextSegmentIndex += 1
+            }
+        }
+        
     }
     
-  
-    
-    return .init(points: coords, boundaries: layout.fontBoundaries, glyphBox: (glyphBoxMin, glyphBoxMax))
+    return (totalGlyphArea, contoursList, abs(baseLineDistance))
+}
+
+public struct GlyphContour {
+    public let endPtsOfContours: [Int]
+    public let points: [CGPoint]
+    public let boundaries: (CGPoint, CGPoint)
 }
 
 public struct Glyph {
     private let bytes: Data
     private let locations: [Int]
     public let fontLayout: GlyphLayout
-    public let contours: GlyphContours
-    public let simpleGlyph: SimpleGlyphTable
+    
+    public let glyphBox: Area<Int16>
+    public let contours: [[Point<Int>]]
+    public let baseLineDistance: Int
     
     init(_ glyph: GlyfTable, using bytes: Data, withLocation locations: [Int], layout: GlyphLayout) {
         self.bytes = bytes
@@ -78,25 +103,31 @@ public struct Glyph {
         
         switch glyph {
             case let .simple(glyph):
-                contours = getBoxPointsData(glyph: glyph, layout: layout)
-                simpleGlyph = glyph
-            case let .compound(glyph):
-            let firstGlyph = glyph.glyphs[0]
-           
+                (glyphBox, contours, baseLineDistance) = buildGlyphPoints(from: [glyph], layout: layout)
             
-            let glyphBytes = bytes.advanced(by: Int(locations[Int(firstGlyph.glyphIndex)]))
-            do {
-                let glyph = try SimpleGlyphTable(glyphBytes)
-                simpleGlyph = glyph
-                contours = getBoxPointsData(glyph: glyph, layout: layout)
-            } catch {
-                contours = .init(points: [], boundaries: layout.fontBoundaries, glyphBox: (CGPoint(x: .zero, y: .zero), CGPoint(x: .zero, y: .zero)))
-                let glyphBytes = bytes.advanced(by: 0)
-                let glyph = try! SimpleGlyphTable(glyphBytes)
-                simpleGlyph = glyph
+            
+            case let .compound(glyph):
+                var glyphs: [SimpleGlyphTable] = []
                 
-                print(error)
-            }
+                for currentGlyph in glyph.glyphs {
+                    let glyphIndex = Int(currentGlyph.glyphIndex)
+                    let glyphLocationOffset = Int(locations[glyphIndex])
+                    
+                    let glyphBytes = bytes.advanced(by: glyphLocationOffset)
+                    
+                    do {
+                        
+                        let offset = CGPoint(x: Double(currentGlyph.offsetX), y: Double(currentGlyph.offsetY))
+                        let simpleGlyphData = try SimpleGlyphTable(glyphBytes, withOffset: offset)
+                        
+                        glyphs.append(simpleGlyphData)
+                    } catch {
+                        glyphs.append(try! SimpleGlyphTable(bytes))
+                    }
+                }
+            
+            
+                (glyphBox, contours, baseLineDistance) = buildGlyphPoints(from: glyphs, layout: layout)
         }
     }
     

@@ -48,9 +48,9 @@ public struct CompoundGlyphItem {
     
     let tableLength: Int
     
-    init(_ bytes: Data, withFlags flags: UInt16) throws {
+    init(_ bytes: Data) throws {
         let read: ReadHead = ReadHead(bytes, index: 0)
-        
+        let flags = read.value(ofType: UInt16.self)!
         glyphIndex = read.value(ofType: UInt16.self)!
         flag = CompoundFlag(flags)
         
@@ -103,19 +103,17 @@ public struct CompoundGlyphTable: Identifiable, Equatable {
         yMin = read.value(ofType: UInt16.self)!
         xMax = read.value(ofType: UInt16.self)!
         yMax = read.value(ofType: UInt16.self)!
-        
-        let flags = read.value(ofType: UInt16.self)!
-        
         do {
-            let glyphA = try CompoundGlyphItem(bytes.advanced(by: read.index), withFlags: flags)
-            read.advance(by: glyphA.tableLength)
-            
-            var glyphList: [CompoundGlyphItem] = [glyphA]
-            
-            if glyphA.flag.moreComponents {
-                let glyphB = try CompoundGlyphItem(bytes.advanced(by: read.index), withFlags: flags)
-                glyphList.append(glyphB)
-            }
+            var glyphList: [CompoundGlyphItem] = []
+            var haveMoreFlags = true
+            repeat {
+                let currentGlyph = try CompoundGlyphItem(bytes.advanced(by: read.index))
+                read.advance(by: currentGlyph.tableLength)
+                
+                glyphList.append(currentGlyph)
+                
+                haveMoreFlags = currentGlyph.flag.moreComponents
+            } while (haveMoreFlags)
             
             glyphs = glyphList
         } catch {

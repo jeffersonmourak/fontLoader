@@ -12,7 +12,7 @@ enum FlagDirection {
     case Y
 }
 
-func readCoordinates(_ read: inout ReadHead, flags: [SimpleGlyphCoordinateFlag], axis: FlagDirection) -> [Int] {
+func readCoordinates(_ read: inout ReadHead, flags: [SimpleGlyphCoordinateFlag], withOffset positionOffset: CGPoint, axis: FlagDirection) -> [Int] {
     var coordinates: [Int] = Array(repeating: 0, count: flags.count)
     var coordCache = 0
     
@@ -20,6 +20,7 @@ func readCoordinates(_ read: inout ReadHead, flags: [SimpleGlyphCoordinateFlag],
         let flag = flags[i]
         let isShort = axis == FlagDirection.X ? flag.xShort : flag.yShort
         let instruction =  axis == FlagDirection.X ? flag.xInstruction : flag.yInstruction
+        let coordinateOffset = Int(axis == FlagDirection.X ? positionOffset.x : positionOffset.y)
         
         if isShort {
             let offset = read.value(ofType: UInt8.self)!
@@ -28,7 +29,7 @@ func readCoordinates(_ read: inout ReadHead, flags: [SimpleGlyphCoordinateFlag],
             let offset = Int(read.value(ofType: Int16.self)!)
             coordCache += offset
         }
-        coordinates[i] = coordCache
+        coordinates[i] = coordCache + coordinateOffset
     }
     
     return coordinates
@@ -81,7 +82,7 @@ public struct SimpleGlyphTable: Identifiable, Equatable {
     
     let tableLength: Int
     
-    init(_ bytes: Data) throws {
+    init(_ bytes: Data, withOffset positionOffset: CGPoint = .init(x: 0, y: 0)) throws {
         var read: ReadHead = ReadHead(bytes, index: 0)
         
         let contoursCount = read.value(ofType: Int16.self)!
@@ -137,8 +138,8 @@ public struct SimpleGlyphTable: Identifiable, Equatable {
         } while(i <= numOfPoints)
         
         flags = rawFlags
-        xCoordinates = readCoordinates(&read, flags: expandedFlags, axis: .X)
-        yCoordinates = readCoordinates(&read, flags: expandedFlags, axis: .Y)
+        xCoordinates = readCoordinates(&read, flags: expandedFlags, withOffset: positionOffset, axis: .X)
+        yCoordinates = readCoordinates(&read, flags: expandedFlags, withOffset: positionOffset, axis: .Y)
         
         numberOfContours = contoursCount
         
