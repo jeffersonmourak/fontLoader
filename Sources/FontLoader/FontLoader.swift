@@ -12,9 +12,9 @@ struct FontValidationError : LocalizedError {
     }
 }
 
-fileprivate func loadTableDir(fromData data: Data, usingSubtable subTable: Subtable) throws -> [TableDirectory] {
+fileprivate func loadTableDir(fromData data: Data, usingSubtable subTable: Subtable) throws -> FontTableDirectoryMap {
     let dirOffset = ReadOffset(startAt: 12, withBlockSize: 16)
-    var tableDirectories: [TableDirectory] = []
+    var tableDirMap: FontTableDirectoryMap = [:]
     var dataWindow = data.advanced(by: dirOffset.offset)
     
     var missingRequiredTables = Set(RequiredTables)
@@ -22,13 +22,13 @@ fileprivate func loadTableDir(fromData data: Data, usingSubtable subTable: Subta
     for _ in 0..<subTable.numTables {
         dirOffset.next()
         
-        let table = TableDirectory(bytes: dataWindow)
+        let table = try TableDirectory(bytes: dataWindow)
         
         if missingRequiredTables.contains(table.tag) {
             missingRequiredTables.remove(table.tag)
         }
         
-        tableDirectories.append(table)
+        tableDirMap[table.tag] = table
         
         dataWindow = data.advanced(by: dirOffset.offset)
     }
@@ -37,7 +37,7 @@ fileprivate func loadTableDir(fromData data: Data, usingSubtable subTable: Subta
         throw FontValidationError("Missing required tables \(missingRequiredTables.joined(separator: ", "))")
     }
     
-    return tableDirectories
+    return tableDirMap
 }
 
 fileprivate func handleInvalid(reason: String) {
@@ -50,11 +50,16 @@ public class FontLoader: FontWithRequiredTables {
     
     public var characters: [Character : CharacterMapItem] = [:]
     
+    public var horizontalHeader: HheaTable
+    public var horizontalMetrics: HmtxTable
+    public var fontInfo: HeadTable
+    public var memoryInfo: MaxpTable
+    
     public init(withData data: Data) throws {
         self.data = data
-        let subTable = Subtable(bytes: data)
+        let subTable = try Subtable(bytes: data)
         
-        var directory: [TableDirectory] = []
+        var directory: FontTableDirectoryMap = [:]
         
         do {
             directory = try loadTableDir(fromData:data, usingSubtable: subTable)
@@ -62,53 +67,36 @@ public class FontLoader: FontWithRequiredTables {
             throw error
         }
         
+        do {
+            memoryInfo = try MaxpTable(bytes: data.advanced(by: Int(directory["maxp"]!.offset)));
+            horizontalHeader = try HheaTable(bytes: data.advanced(by: Int(directory["hhea"]!.offset) + 2))
+            horizontalMetrics =  try HmtxTable(bytes: data.advanced(by: Int(directory["hmtx"]!.offset)), numOfLongHorMetrics: Int(horizontalHeader.numOfLongHorMetrics), numOfGlyphs: Int(memoryInfo.numGlyphs))
+            fontInfo = try HeadTable(bytes: data.advanced(by: Int(directory["head"]!.offset)))
+        } catch {
+            throw error
+        }
         
         super.init(subTable: subTable, directory: directory)
         
+        characters = try cmapLookup()
         
-        characters = cmapLookup()
-        
     }
-    
-    public var horizontalHeader: HheaTable {
-        get {
-            let hhea = HheaTable(bytes: data.advanced(by: Int(hhea.offset) + 2))
-            
-            return hhea;
-        }
-    }
-    
-    public var horizontalMetrics: HmtxTable {
-        get {
-            let hmtx = HmtxTable(bytes: data.advanced(by: Int(hmtx.offset)), numOfLongHorMetrics: Int(horizontalHeader.numOfLongHorMetrics), numOfGlyphs: Int(memoryInfo.numGlyphs))
-            
-            return hmtx;
-        }
-    }
-    
-    public var fontInfo: HeadTable {
-        get {
-            return HeadTable(bytes: data.advanced(by: Int(head.offset)))
-        }
-    }
-    
-    public var memoryInfo: MaxpTable {
-        get {
-            return MaxpTable(bytes: data.advanced(by: Int(maxp.offset)));
-        }
-    }
-    
+
     public var glyphLocations: [Int] {
         get {
-            if (fontInfo.indexToLocFormat == 1) {
-                return LocaTable<UInt32>(bytes: data.advanced(by: Int(loca.offset)), withSize: Int(memoryInfo.numGlyphs)).indexes.map { Int($0) }
-            } else {
-               return LocaTable<UInt16>(bytes: data.advanced(by: Int(loca.offset)), withSize: Int(memoryInfo.numGlyphs)).indexes.map { Int($0) * 2 }
+            do {
+                if (fontInfo.indexToLocFormat == 1) {
+                    return try LocaTable<UInt32>(bytes: data.advanced(by: Int(loca.offset)), withSize: Int(memoryInfo.numGlyphs)).indexes.map { Int($0) }
+                } else {
+                   return try LocaTable<UInt16>(bytes: data.advanced(by: Int(loca.offset)), withSize: Int(memoryInfo.numGlyphs)).indexes.map { Int($0) * 2 }
+                }
+            } catch {
+                return []
             }
         }
     }
     
-    public func getGlyphTableOrMissing(at index: Int) -> (Int, GlyfTable) {
+    public func getGlyphTableOrMissing(at index: Int) throws -> (Int, GlyfTable) {
         let targetIndex = Int(glyf.offset) + Int(glyphLocations[index])
         let bytes = data.advanced(by: Int(glyf.offset))
         
@@ -119,21 +107,21 @@ public class FontLoader: FontWithRequiredTables {
         return (index, glyphData)
     }
     
-    public func getGlyphContours(at index: Int) -> Glyph {
+    public func getGlyphContours(at index: Int) throws -> Glyph {
         let bytes = data.advanced(by: Int(glyf.offset))
         let fontBoundaries = (CGPoint(x: Double(fontInfo.xMin), y: Double(fontInfo.yMin)), (CGPoint(x: Double(fontInfo.xMax), y: Double(fontInfo.yMax))))
         
-        let (resolvedIndex, glyphData) = getGlyphTableOrMissing(at: index)
+        let (resolvedIndex, glyphData) = try getGlyphTableOrMissing(at: index)
         
         let glyphLayout: GlyphLayout = .init(fontBoundaries: fontBoundaries, horizontalMetrics: horizontalMetrics.hMetrics[resolvedIndex])
 
         return Glyph(glyphData, using: bytes, withLocation: glyphLocations, layout: glyphLayout)
     }
     
-    func cmapLookup () -> [Character : CharacterMapItem] {
+    func cmapLookup () throws -> [Character : CharacterMapItem] {
         let initialOffset = Int(self.cmap.offset)
         let bytes = data.advanced(by: initialOffset)
-        let subTables = CmapTable(bytes: bytes).subTables
+        let subTables = try CmapTable(bytes: bytes).subTables
         
         var cmapSubtableOffset = 0
         var selectedUnicode = -1
@@ -152,14 +140,14 @@ public class FontLoader: FontWithRequiredTables {
             }
         }
         
-        let format = bytes.value(ofType: UInt16.self, at: cmapSubtableOffset)!
+        let format = try bytes.value(ofType: UInt16.self, at: cmapSubtableOffset)
                 
         if format == 4 {
-            return CmapTableFormat4(bytes: data, cmapStartOffset: initialOffset + cmapSubtableOffset).toCharacterMap()
+            return try CmapTableFormat4(bytes: data, cmapStartOffset: initialOffset + cmapSubtableOffset).toCharacterMap()
         }
         
         if format == 12 {
-            return CmapTableFormat12(bytes: bytes.advanced(by: cmapSubtableOffset)).toCharacterMap()
+            return try CmapTableFormat12(bytes: bytes.advanced(by: cmapSubtableOffset)).toCharacterMap()
         }
         
         return [:]

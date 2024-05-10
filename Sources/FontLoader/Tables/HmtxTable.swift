@@ -20,25 +20,29 @@ public struct HmtxTable {
     
     let tableLength: Int
     
-    init(bytes: Data, numOfLongHorMetrics: Int, numOfGlyphs: Int) {
+    init(bytes: Data, numOfLongHorMetrics: Int, numOfGlyphs: Int) throws {
         let read: ReadHead = ReadHead(bytes, index: 0)
         
-        var hMetrics: [LongHorMetric] = []
-        
-        for _ in 0..<numOfLongHorMetrics {
-            hMetrics.append(.init(advanceWidth: read.value(ofType: UInt16.self)!, leftSideBearing: read.value(ofType: Int16.self)!))
+        do {
+            var hMetrics: [LongHorMetric] = []
+            
+            for _ in 0..<numOfLongHorMetrics {
+                hMetrics.append(.init(advanceWidth: try read.value(ofType: UInt16.self), leftSideBearing: try read.value(ofType: Int16.self)))
+            }
+            
+            self.hMetrics = hMetrics
+            
+            
+            var leftSideBearings: [FWord] = []
+            
+            for _ in 0..<(numOfGlyphs - numOfLongHorMetrics) {
+                leftSideBearings.append(try read.value(ofType: FWord.self))
+            }
+            
+            self.leftSideBearing = leftSideBearings
+        } catch {
+            throw error
         }
-        
-        self.hMetrics = hMetrics
-        
-        
-        var leftSideBearings: [FWord] = []
-        
-        for _ in 0..<(numOfGlyphs - numOfLongHorMetrics) {
-            leftSideBearings.append(read.value(ofType: FWord.self)!)
-        }
-        
-        self.leftSideBearing = leftSideBearings
         
         
         tableLength = read.index

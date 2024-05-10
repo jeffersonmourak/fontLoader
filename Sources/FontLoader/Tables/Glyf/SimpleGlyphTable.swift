@@ -7,12 +7,24 @@
 
 import Foundation
 
+struct SimpleGlyphValidationError : LocalizedError {
+    let description: String
+    
+    init (_ description: String) {
+        self.description = description
+    }
+    
+    var errorDescription: String? {
+        description
+    }
+}
+
 enum FlagDirection {
     case X
     case Y
 }
 
-func readCoordinates(_ read: inout ReadHead, flags: [SimpleGlyphCoordinateFlag], axis: FlagDirection) -> [Int] {
+func readCoordinates(_ read: inout ReadHead, flags: [SimpleGlyphCoordinateFlag], axis: FlagDirection) throws -> [Int] {
     var coordinates: [Int] = Array(repeating: 0, count: flags.count)
     var coordCache = 0
     
@@ -22,10 +34,10 @@ func readCoordinates(_ read: inout ReadHead, flags: [SimpleGlyphCoordinateFlag],
         let instruction =  axis == FlagDirection.X ? flag.xInstruction : flag.yInstruction
         
         if isShort {
-            let offset = read.value(ofType: UInt8.self)!
+            let offset = try read.value(ofType: UInt8.self)
             coordCache += instruction ? Int(offset) : -Int(offset)
         } else if !instruction {
-            let offset = Int(read.value(ofType: Int16.self)!)
+            let offset = Int(try read.value(ofType: Int16.self))
             coordCache += offset
         }
         coordinates[i] = coordCache
@@ -84,44 +96,47 @@ public struct SimpleGlyphTable: Identifiable, Equatable {
     init(_ bytes: Data) throws {
         var read: ReadHead = ReadHead(bytes, index: 0)
         
-        let contoursCount = read.value(ofType: Int16.self)!
+        let contoursCount = try read.value(ofType: Int16.self)
         
         guard contoursCount >= 0 else {
             throw GlyphValidationError("Expected Simple Glyph Data but received a Compound Glyph insted")
         }
         
-        xMin = read.value(ofType: Int16.self)!
-        yMin = read.value(ofType: Int16.self)!
-        xMax = read.value(ofType: Int16.self)!
-        yMax = read.value(ofType: Int16.self)!
+        xMin = try read.value(ofType: Int16.self)
+        yMin = try read.value(ofType: Int16.self)
+        xMax = try read.value(ofType: Int16.self)
+        yMax = try read.value(ofType: Int16.self)
         
         var endPtsOfContours = Array(repeating: 0, count: Int(contoursCount))
         
         for i in 0..<Int(contoursCount) {
-            let contourEndIndex = Int(read.value(ofType: UInt16.self)!)
+            let contourEndIndex = Int(try read.value(ofType: UInt16.self))
             endPtsOfContours[i] = contourEndIndex
         }
         
-        let numOfPoints = endPtsOfContours.last!
+        
+        guard let numOfPoints = endPtsOfContours.last else {
+            throw SimpleGlyphValidationError("Empty Contours")
+        }
         
         self.endPtsOfContours = endPtsOfContours
         
-        instructionLength = read.value(ofType: Int16.self)!
-        instructions = read.values(ofType: UInt8.self, withSize: Int(instructionLength))
+        instructionLength = try read.value(ofType: Int16.self)
+        instructions = try read.values(ofType: UInt8.self, withSize: Int(instructionLength))
         
         var expandedFlags: [SimpleGlyphCoordinateFlag] = []
         var rawFlags: [UInt8] = []
         var i = 0
         
         repeat {
-            let flagByte = read.value(ofType: UInt8.self)!
+            let flagByte = try read.value(ofType: UInt8.self)
             let flag = SimpleGlyphCoordinateFlag(flagByte)
             
             rawFlags.append(flagByte)
             expandedFlags.append(flag)
             
             if flag.repeating {
-                let repeatCount = read.value(ofType: UInt8.self)!
+                let repeatCount = try read.value(ofType: UInt8.self)
                 rawFlags.append(repeatCount)
                 i += 1
                 
@@ -137,8 +152,8 @@ public struct SimpleGlyphTable: Identifiable, Equatable {
         } while(i <= numOfPoints)
         
         flags = rawFlags
-        xCoordinates = readCoordinates(&read, flags: expandedFlags, axis: .X)
-        yCoordinates = readCoordinates(&read, flags: expandedFlags, axis: .Y)
+        xCoordinates = try readCoordinates(&read, flags: expandedFlags, axis: .X)
+        yCoordinates = try readCoordinates(&read, flags: expandedFlags, axis: .Y)
         
         numberOfContours = contoursCount
         

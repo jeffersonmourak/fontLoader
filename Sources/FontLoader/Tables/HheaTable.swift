@@ -29,26 +29,26 @@ public struct HheaTable {
     
     let tableLength: Int
     
-    init(bytes: Data) {
+    init(bytes: Data) throws {
         let read: ReadHead = ReadHead(bytes, index: 0)
         
-        version = read.value(ofType: Fixed.self)!
-        ascent = read.value(ofType: FWord.self)!
-        descent = read.value(ofType: FWord.self)!
-        lineGap = read.value(ofType: FWord.self)!
-        advanceWidthMax = read.value(ofType: uFWord.self)!
-        minLeftSideBearing = read.value(ofType: FWord.self)!
-        minRightSideBearing = read.value(ofType: FWord.self)!
-        xMaxExtent = read.value(ofType: FWord.self)!
-        caretSlopeRise = read.value(ofType: Int16.self)!
-        caretSlopeRun = read.value(ofType: Int16.self)!
-        caretOffset = read.value(ofType: FWord.self)!
-        _reserved0 = read.value(ofType: Int16.self)!
-        _reserved1 = read.value(ofType: Int16.self)!
-        _reserved2 = read.value(ofType: Int16.self)!
-        _reserved3 = read.value(ofType: Int16.self)!
-        metricDataFormat = read.value(ofType: Int16.self)!
-        numOfLongHorMetrics = read.value(ofType: UInt16.self)!
+        version = try read.value(ofType: Fixed.self)
+        ascent = try read.value(ofType: FWord.self)
+        descent = try read.value(ofType: FWord.self)
+        lineGap = try read.value(ofType: FWord.self)
+        advanceWidthMax = try read.value(ofType: uFWord.self)
+        minLeftSideBearing = try read.value(ofType: FWord.self)
+        minRightSideBearing = try read.value(ofType: FWord.self)
+        xMaxExtent = try read.value(ofType: FWord.self)
+        caretSlopeRise = try read.value(ofType: Int16.self)
+        caretSlopeRun = try read.value(ofType: Int16.self)
+        caretOffset = try read.value(ofType: FWord.self)
+        _reserved0 = try read.value(ofType: Int16.self)
+        _reserved1 = try read.value(ofType: Int16.self)
+        _reserved2 = try read.value(ofType: Int16.self)
+        _reserved3 = try read.value(ofType: Int16.self)
+        metricDataFormat = try read.value(ofType: Int16.self)
+        numOfLongHorMetrics = try read.value(ofType: UInt16.self)
     
         tableLength = read.index
     }

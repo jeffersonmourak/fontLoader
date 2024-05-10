@@ -9,42 +9,42 @@ import Foundation
 
 
 public struct MaxpTable {
-    let version: UInt32
-    let numGlyphs: UInt16
-    let maxPoints: UInt16
-    let maxContours: UInt16
-    let maxComponentPoints: UInt16
-    let maxComponentContours: UInt16
-    let maxZones: UInt16
-    let maxTwilightPoints: UInt16
-    let maxStorage: UInt16
-    let maxFunctionDefs: UInt16
-    let maxInstructionDefs: UInt16
-    let maxStackElements: UInt16
-    let maxSizeOfInstructions: UInt16
-    let maxComponentElements: UInt16
-    let maxComponentDepth: UInt16
+    public let version: UInt32
+    public let numGlyphs: UInt16
+    public let maxPoints: UInt16
+    public let maxContours: UInt16
+    public let maxComponentPoints: UInt16
+    public let maxComponentContours: UInt16
+    public let maxZones: UInt16
+    public let maxTwilightPoints: UInt16
+    public let maxStorage: UInt16
+    public let maxFunctionDefs: UInt16
+    public let maxInstructionDefs: UInt16
+    public let maxStackElements: UInt16
+    public let maxSizeOfInstructions: UInt16
+    public let maxComponentElements: UInt16
+    public let maxComponentDepth: UInt16
     
     let tableLength: Int
     
-    init(bytes: Data) {
+    init(bytes: Data) throws {
         let read: ReadHead = ReadHead(bytes, index: 0)
         
-        version = read.value(ofType: UInt32.self)!
-        numGlyphs = read.value(ofType: UInt16.self)!
-        maxPoints = read.value(ofType: UInt16.self)!
-        maxContours = read.value(ofType: UInt16.self)!
-        maxComponentPoints = read.value(ofType: UInt16.self)!
-        maxComponentContours = read.value(ofType: UInt16.self)!
-        maxZones = read.value(ofType: UInt16.self)!
-        maxTwilightPoints = read.value(ofType: UInt16.self)!
-        maxStorage = read.value(ofType: UInt16.self)!
-        maxFunctionDefs = read.value(ofType: UInt16.self)!
-        maxInstructionDefs = read.value(ofType: UInt16.self)!
-        maxStackElements = read.value(ofType: UInt16.self)!
-        maxSizeOfInstructions = read.value(ofType: UInt16.self)!
-        maxComponentElements = read.value(ofType: UInt16.self)!
-        maxComponentDepth = read.value(ofType: UInt16.self)!
+        version = try read.value(ofType: UInt32.self)
+        numGlyphs = try read.value(ofType: UInt16.self)
+        maxPoints = try read.value(ofType: UInt16.self)
+        maxContours = try read.value(ofType: UInt16.self)
+        maxComponentPoints = try read.value(ofType: UInt16.self)
+        maxComponentContours = try read.value(ofType: UInt16.self)
+        maxZones = try read.value(ofType: UInt16.self)
+        maxTwilightPoints = try read.value(ofType: UInt16.self)
+        maxStorage = try read.value(ofType: UInt16.self)
+        maxFunctionDefs = try read.value(ofType: UInt16.self)
+        maxInstructionDefs = try read.value(ofType: UInt16.self)
+        maxStackElements = try read.value(ofType: UInt16.self)
+        maxSizeOfInstructions = try read.value(ofType: UInt16.self)
+        maxComponentElements = try read.value(ofType: UInt16.self)
+        maxComponentDepth = try read.value(ofType: UInt16.self)
     
         tableLength = read.index
     }

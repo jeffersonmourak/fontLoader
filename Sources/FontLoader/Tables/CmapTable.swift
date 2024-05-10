@@ -46,18 +46,18 @@ public struct CmapTable {
     
     let tableLength: Int
     
-    init(bytes: Data) {
+    init(bytes: Data) throws {
         let read: ReadHead = ReadHead(bytes, index: 0)
         
-        version = read.value(ofType: UInt16.self)!
-        numSubtables = read.value(ofType: UInt16.self)!
+        version = try read.value(ofType: UInt16.self)
+        numSubtables = try read.value(ofType: UInt16.self)
         
         var tables: [CmapPlatformTable] = []
         
         for i in 0..<numSubtables {
-            let platformId = read.value(ofType: UInt16.self)!
-            let platformSpecificID = read.value(ofType: UInt16.self)!
-            let offset = read.value(ofType: UInt32.self)!
+            let platformId = try read.value(ofType: UInt16.self)
+            let platformSpecificID = try read.value(ofType: UInt16.self)
+            let offset = try read.value(ofType: UInt32.self)
             
             tables.append(.init(platformId: platformId, platformSpecificID: platformSpecificID, offset: offset))
         }
@@ -95,46 +95,46 @@ public struct CmapTableFormat4 {
     
     let tableLength: Int
     
-    init(bytes: Data, cmapStartOffset startOffset: Int) {
+    init(bytes: Data, cmapStartOffset startOffset: Int) throws {
         let read: ReadHead = ReadHead(bytes, index: startOffset)
         
-        format = read.value(ofType: UInt16.self)!
-        length = read.value(ofType: UInt16.self)!
-        language = read.value(ofType: UInt16.self)!
-        segCountX2 = read.value(ofType: UInt16.self)!
-        searchRange = read.value(ofType: UInt16.self)!
-        entrySelector = read.value(ofType: UInt16.self)!
-        rangeShift = read.value(ofType: UInt16.self)!
+        format = try read.value(ofType: UInt16.self)
+        length = try read.value(ofType: UInt16.self)
+        language = try read.value(ofType: UInt16.self)
+        segCountX2 = try read.value(ofType: UInt16.self)
+        searchRange = try read.value(ofType: UInt16.self)
+        entrySelector = try read.value(ofType: UInt16.self)
+        rangeShift = try read.value(ofType: UInt16.self)
         
         let segCount = Int(segCountX2) / 2
         
         var endCodes: [Int] = []
         for _ in 0..<segCount
         {
-            let endCode = read.value(ofType: UInt16.self)!
+            let endCode = try read.value(ofType: UInt16.self)
             endCodes.append(Int(endCode))
         }
         
-        reservedPad = read.value(ofType: UInt16.self)!
+        reservedPad = try read.value(ofType: UInt16.self)
         
         var startCodes: [Int] = []
         for _ in 0..<segCount
         {
-            let startCode = read.value(ofType: UInt16.self)!
+            let startCode = try read.value(ofType: UInt16.self)
             startCodes.append(Int(startCode))
         }
         
         var deltaIds: [Int] = []
         for _ in 0..<segCount
         {
-            let deltaId = read.value(ofType: UInt16.self)!
+            let deltaId = try read.value(ofType: UInt16.self)
             deltaIds.append(Int(deltaId))
         }
         
         var idRangeOffsets: [(Int, Int)] = []
         for _ in 0..<segCount
         {
-            let offset = read.value(ofType: UInt16.self)!
+            let offset = try read.value(ofType: UInt16.self)
             idRangeOffsets.append((Int(offset), Int(read.index)))
         }
         
@@ -156,7 +156,7 @@ public struct CmapTableFormat4 {
                     
                     let glyphBytes = bytes.advanced(by: glyphIndexArrayLocation)
                     
-                    glyphIndex = Int(glyphBytes.value(ofType: UInt16.self, at: 0)!)
+                    glyphIndex = Int(try glyphBytes.value(ofType: UInt16.self, at: 0))
                     
                     if glyphIndex != 0 {
                         glyphIndex = (glyphIndex + deltaIds[i]) % 65536;
@@ -201,22 +201,22 @@ public struct CmapTableFormat12 {
     
     let tableLength: Int
     
-    init(bytes: Data) {
+    init(bytes: Data) throws {
         let read: ReadHead = ReadHead(bytes, index: 0)
         
-        format = read.value(ofType: UInt16.self)!
-        RESERVED = read.value(ofType: UInt16.self)!
-        length = read.value(ofType: UInt32.self)!
-        language = read.value(ofType: UInt32.self)!
-        groupsCount = read.value(ofType: UInt32.self)!
+        format = try read.value(ofType: UInt16.self)
+        RESERVED = try read.value(ofType: UInt16.self)
+        length = try read.value(ofType: UInt32.self)
+        language = try read.value(ofType: UInt32.self)
+        groupsCount = try read.value(ofType: UInt32.self)
         
         var groups: [CmapTableGroup] = []
         var includeMissingCharGlyph = false
         
         for _ in 0..<groupsCount {
-            let startCharCode = read.value(ofType: UInt32.self)!
-            let endCharCode = read.value(ofType: UInt32.self)!
-            let startGlyphIndex = read.value(ofType: UInt32.self)!
+            let startCharCode = try read.value(ofType: UInt32.self)
+            let endCharCode = try read.value(ofType: UInt32.self)
+            let startGlyphIndex = try read.value(ofType: UInt32.self)
             
             let charCount = endCharCode - startCharCode + 1
             

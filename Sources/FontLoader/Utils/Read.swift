@@ -14,6 +14,10 @@ protocol ReadHeadProtocol {
     mutating func recue(by decreaseOffset: Int) -> Void
 }
 
+enum ReadHeadError: Error {
+    case ReadFail
+}
+
 class ReadHead: ReadHeadProtocol {
     let bytes: Data
     var index: Int
@@ -23,8 +27,8 @@ class ReadHead: ReadHeadProtocol {
         self.index = index
     }
     
-    func value<T: BinaryInteger>(ofType: T.Type, at offset: Int, convertEndian: Bool = false, advanceWhenRead: Bool = true) -> T? {
-        let byteValue: T? = bytes.value(ofType: ofType, at: offset, convertEndian: convertEndian)
+    func value<T: BinaryInteger>(ofType: T.Type, at offset: Int, convertEndian: Bool = false, advanceWhenRead: Bool = true) throws -> T {
+        let byteValue: T = try bytes.value(ofType: ofType, at: offset, convertEndian: convertEndian)
         
         if (advanceWhenRead) {
             self.advance(by: MemoryLayout<T>.size)
@@ -33,8 +37,18 @@ class ReadHead: ReadHeadProtocol {
         return byteValue
     }
     
-    func valueF2Dot14(at offset: Int, convertEndian: Bool = false, advanceWhenRead: Bool = true) -> Double {
-        let byteValue = bytes.valueF2Dot14(at: offset, convertEndian: convertEndian)
+    func value(ofType: Int8.Type, at offset: Int, convertEndian: Bool = false, advanceWhenRead: Bool = true) throws -> Int8 {
+        let byteValue: Int8 = try bytes.value(ofType: ofType, at: offset, convertEndian: convertEndian)
+        
+        if (advanceWhenRead) {
+            self.advance(by: MemoryLayout<Int8>.size)
+        }
+        
+        return byteValue
+    }
+    
+    func valueF2Dot14(at offset: Int, convertEndian: Bool = false, advanceWhenRead: Bool = true) throws -> Double {
+        let byteValue = try bytes.valueF2Dot14(at: offset, convertEndian: convertEndian)
         
         if (advanceWhenRead) {
             self.advance(by: MemoryLayout<UInt16>.size)
@@ -43,23 +57,27 @@ class ReadHead: ReadHeadProtocol {
         return byteValue
     }
     
-    func valueF2Dot14(convertEndian: Bool = false, advanceWhenRead: Bool = true) -> Double {
-        return self.valueF2Dot14(at: self.index, convertEndian: convertEndian, advanceWhenRead: advanceWhenRead)
+    func valueF2Dot14(convertEndian: Bool = false, advanceWhenRead: Bool = true) throws -> Double {
+        return try self.valueF2Dot14(at: self.index, convertEndian: convertEndian, advanceWhenRead: advanceWhenRead)
     }
     
-    func value<T: BinaryInteger>(ofType: T.Type, convertEndian: Bool = false, advanceWhenRead: Bool = true) -> T? {
-        return self.value(ofType: ofType, at: self.index, convertEndian: convertEndian, advanceWhenRead: advanceWhenRead)
+    func value<T: BinaryInteger>(ofType: T.Type, convertEndian: Bool = false, advanceWhenRead: Bool = true) throws -> T {
+        return try self.value(ofType: ofType, at: self.index, convertEndian: convertEndian, advanceWhenRead: advanceWhenRead)
     }
     
-    func values<T: BinaryInteger>(ofType: T.Type, at offset: Int, withSize length: Int, convertEndian: Bool = false, advanceWhenRead: Bool = true) -> [T] {
-        let (valuesArray, arrayOffset) = byteToArray(bytes.advanced(by: offset), ofType: ofType, length: length)
+    func value(ofType: Int8.Type, convertEndian: Bool = false, advanceWhenRead: Bool = true) throws -> Int8 {
+        return try self.value(ofType: ofType, at: self.index, convertEndian: convertEndian, advanceWhenRead: advanceWhenRead)
+    }
+    
+    func values<T: BinaryInteger>(ofType: T.Type, at offset: Int, withSize length: Int, convertEndian: Bool = false, advanceWhenRead: Bool = true) throws -> [T] {
+        let (valuesArray, arrayOffset) = try byteToArray(bytes.advanced(by: offset), ofType: ofType, length: length)
         advance(by: arrayOffset)
         
         return valuesArray
     }
     
-    func values<T: BinaryInteger>(ofType: T.Type, withSize length: Int, convertEndian: Bool = false, advanceWhenRead: Bool = true) -> [T] {
-        return values(ofType: ofType, at: index, withSize: length, convertEndian: convertEndian, advanceWhenRead: advanceWhenRead)
+    func values<T: BinaryInteger>(ofType: T.Type, withSize length: Int, convertEndian: Bool = false, advanceWhenRead: Bool = true) throws -> [T] {
+        return try values(ofType: ofType, at: index, withSize: length, convertEndian: convertEndian, advanceWhenRead: advanceWhenRead)
     }
     
     func advance(by sumOffset: Int) {

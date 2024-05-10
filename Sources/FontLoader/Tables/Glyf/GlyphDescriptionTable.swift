@@ -28,14 +28,14 @@ public struct GlyphDescriptionTable {
     
     let tableLength: Int
     
-    init(bytes: Data) {
+    init(bytes: Data) throws {
         let read: ReadHead = ReadHead(bytes, index: 0)
         
-        numberOfContours = read.value(ofType: UInt16.self)!
-        xMin = read.value(ofType: Int16.self)!
-        yMin = read.value(ofType: Int16.self)!
-        xMax = read.value(ofType: Int16.self)!
-        yMax = read.value(ofType: Int16.self)!
+        numberOfContours = try read.value(ofType: UInt16.self)
+        xMin = try read.value(ofType: Int16.self)
+        yMin = try read.value(ofType: Int16.self)
+        xMax = try read.value(ofType: Int16.self)
+        yMax = try read.value(ofType: Int16.self)
         tableLength = read.index
     }
 }

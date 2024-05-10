@@ -7,6 +7,8 @@
 
 import Foundation
 
+public typealias FontTableDirectoryMap = [String: TableDirectory]
+
 public struct Subtable {
     let scalerType: UInt32
     let numTables: UInt16
@@ -16,14 +18,14 @@ public struct Subtable {
     
     let tableLength: Int
     
-    init(bytes: Data) {
+    init(bytes: Data) throws {
         let read = ReadHead(bytes, index: 0)
         
-        scalerType = read.value(ofType: UInt32.self)!
-        numTables = read.value(ofType: UInt16.self)!
-        searchRange = read.value(ofType: UInt16.self)!
-        entrySelector = read.value(ofType: UInt16.self)!
-        rangeShift = read.value(ofType: UInt16.self)!
+        scalerType = try read.value(ofType: UInt32.self)
+        numTables = try read.value(ofType: UInt16.self)
+        searchRange = try read.value(ofType: UInt16.self)
+        entrySelector = try read.value(ofType: UInt16.self)
+        rangeShift = try read.value(ofType: UInt16.self)
         tableLength = read.index
     }
 }
@@ -35,35 +37,26 @@ public struct TableDirectory {
     let length: UInt32
     let tableLength: Int
     
-    init(bytes: Data) {
+    init(bytes: Data) throws {
         let read: ReadHead = ReadHead(bytes, index: 0)
         
-        tag = byteToString(read.value(ofType: UInt32.self, convertEndian: true)!, withSize: 4)
-        checkSum = read.value(ofType: UInt32.self)!
-        offset = read.value(ofType: UInt32.self)!
-        length = read.value(ofType: UInt32.self)!
+        tag = byteToString(try read.value(ofType: UInt32.self, convertEndian: true), withSize: 4)
+        checkSum = try read.value(ofType: UInt32.self)
+        offset = try read.value(ofType: UInt32.self)
+        length = try read.value(ofType: UInt32.self)
         tableLength = read.index
     }
 }
 
 public class FontWithRequiredTables {
     public let subTable: Subtable
-    public let directory: [TableDirectory]
+    private let dirMap: FontTableDirectoryMap
     
-    private var dirMap: [String: TableDirectory] = [:]
-    
-    init(subTable: Subtable, directory: [TableDirectory]) {
+    init(subTable: Subtable, directory: FontTableDirectoryMap) {
         self.subTable = subTable
-        self.directory = directory
-        
-        self.mapDirectories()
+        self.dirMap = directory
     }
-    
-    private func mapDirectories() {
-        for table in directory {
-            dirMap[table.tag] = table
-        }
-    }
+
     
     /**
      Character to glyph mapping

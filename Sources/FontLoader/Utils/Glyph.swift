@@ -116,7 +116,8 @@ public struct GlyphContour {
     public let boundaries: (CGPoint, CGPoint)
 }
 
-public struct Glyph {
+public struct Glyph: Identifiable {
+    public let id: UUID = UUID()
     private let bytes: Data
     private let locations: [Int]
     public let fontLayout: GlyphLayout

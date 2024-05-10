@@ -11,7 +11,7 @@ import Foundation
 public enum GlyfTable {
     init(_ bytes: Data) throws {
         do {
-            let contoursCount = bytes.value(ofType: Int16.self, at: 0)!
+            let contoursCount = try bytes.value(ofType: Int16.self, at: 0)
             
             if contoursCount < 0 {
                 self = .compound(try CompoundGlyphTable(bytes))

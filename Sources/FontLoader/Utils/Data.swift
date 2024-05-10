@@ -14,26 +14,21 @@ public typealias uFWord = UInt16
 public typealias F2Dot14 = UInt16
 public typealias longDateTime = Int64
 
+public enum DataError: Error {
+    case ParseError
+}
+
 public func byteToString(_ data: UInt32, withSize size: Int) -> String {
     var string = data
     
     return NSString(bytes: &string, length: size, encoding: NSUTF8StringEncoding)! as String
 }
 
-public func maybeByteToArray<T: BinaryInteger>(_ bytes: Data, ofType: T.Type, length: Int) -> [T?] {
+public func byteToArray<T: BinaryInteger>(_ bytes: Data, ofType: T.Type, length: Int) throws -> ([T], Int) {
     let read: ReadHead = ReadHead(bytes, index: 0)
     
-    return Array(repeating: 0, count: length).map { _ in
-        return read.value(ofType: ofType)
-    }
-    
-}
-
-public func byteToArray<T: BinaryInteger>(_ bytes: Data, ofType: T.Type, length: Int) -> ([T], Int) {
-    let read: ReadHead = ReadHead(bytes, index: 0)
-    
-    let arrayFromByte = Array(repeating: 0, count: length).map { _ in
-        return read.value(ofType: ofType)!
+    let arrayFromByte = try Array(repeating: 0, count: length).map { _ in
+        return try read.value(ofType: ofType)
     }
     
     return (arrayFromByte, read.index)
@@ -57,24 +52,42 @@ enum FontBinaryType {
 
 extension Data {
     subscript<T: BinaryInteger>(at offset: Int, convertEndian convertEndian: Bool = false) -> T? {
-        value(ofType: T.self, at: offset, convertEndian: convertEndian)
+        try? value(ofType: T.self, at: offset, convertEndian: convertEndian)
     }
     
-    func value<T: BinaryInteger>(ofType: T.Type, at offset: Int, convertEndian: Bool = false) -> T? {
-        let right = offset &+ MemoryLayout<T>.size
-        guard offset >= 0 && right > offset && right <= count else {
-            return nil
-        }
-        let bytes = self[offset ..< right]
-        if convertEndian {
-            return bytes.reversed().reduce(0) { T($0) << 8 + T($1) }
-        } else {
-            return bytes.reduce(0) { T($0) << 8 + T($1) }
+    func value<T: BinaryInteger>(ofType: T.Type, at offset: Int, convertEndian: Bool = false) throws -> T {
+        do {
+            let right = offset &+ MemoryLayout<T>.size
+            guard offset >= 0 && right > offset && right <= count else {
+                throw DataError.ParseError
+            }
+            let bytes = self[offset ..< right]
+            
+            if convertEndian {
+                return bytes.reversed().reduce(0) { T($0) << 8 + T($1) }
+            } else {
+                return bytes.reduce(0) { T($0) << 8 + T($1) }
+            }
+        } catch {
+            throw error
         }
     }
     
-    func valueF2Dot14(at offset: Int, convertEndia: Bool = false, convertEndian: Bool = false) -> Double {
-        let usignedValue = self.value(ofType: UInt16.self, at: offset)!
+    func value(ofType: Int8.Type, at offset: Int, convertEndian: Bool = false) throws -> Int8 {
+        do {
+            let right = offset &+ MemoryLayout<Int8>.size
+            guard offset >= 0 && right > offset && right <= count else {
+                throw DataError.ParseError
+            }
+            let bytes = self[offset ..< right]
+            return try bytes.withUnsafeBytes<Int8>() { Int8(bitPattern: Data($0)[0]) }
+        } catch {
+            throw error
+        }
+    }
+    
+    func valueF2Dot14(at offset: Int, convertEndia: Bool = false, convertEndian: Bool = false) throws -> Double {
+        let usignedValue = try self.value(ofType: UInt16.self, at: offset)
         
         let dividend = Double((1<<14))
         

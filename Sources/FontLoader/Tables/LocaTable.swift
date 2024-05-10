@@ -12,9 +12,9 @@ public struct LocaTable<T: BinaryInteger> {
     
     let tableLength: Int
     
-    init(bytes: Data, withSize length: Int) {
+    init(bytes: Data, withSize length: Int) throws {
         let read: ReadHead = ReadHead(bytes, index: 0)
-        indexes = read.values(ofType: T.self, withSize: length)
+        indexes = try read.values(ofType: T.self, withSize: length)
         
         tableLength = read.index
     }
@@ -34,9 +34,9 @@ public struct LocaTable<T: BinaryInteger> {
 }
 
 extension LocaTable where T == UInt16 {
-    init(bytes: Data, withSize length: Int) {
+    init(bytes: Data, withSize length: Int) throws {
         let read: ReadHead = ReadHead(bytes, index: 0)
-        indexes = read.values(ofType: T.self, withSize: length).map { $0 }
+        indexes = try read.values(ofType: T.self, withSize: length).map { $0 }
         
         tableLength = read.index
     }

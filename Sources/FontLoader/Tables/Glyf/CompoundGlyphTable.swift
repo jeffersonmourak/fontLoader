@@ -33,7 +33,7 @@ public struct CompoundFlag {
         weHaveAInstructions = byte.isBitSet(at: 8)
         useMyMetrics = byte.isBitSet(at: 9)
         overlapCompound = byte.isBitSet(at: 10)
-
+        
         self.byte = byte
     }
 }
@@ -49,43 +49,43 @@ public struct CompoundGlyphItem {
     
     init(_ bytes: Data) throws {
         let read: ReadHead = ReadHead(bytes, index: 0)
-        let flags = read.value(ofType: UInt16.self)!
-        glyphIndex = read.value(ofType: UInt16.self)!
+        let flags = try read.value(ofType: UInt16.self)
+        glyphIndex = try read.value(ofType: UInt16.self)
         flag = CompoundFlag(flags)
         
         if !flag.argsAreXYValues {
             throw GlyphValidationError("OFFSET INDEX TO IMPLEMENT")
         }
         
-        offsetX = flag.argsAreWords ? read.value(ofType: Int16.self)! : Int16(read.value(ofType: Int8.self)!)
-        offsetY = flag.argsAreWords ? read.value(ofType: Int16.self)! : Int16(read.value(ofType: Int8.self)!)
+        offsetX = flag.argsAreWords ? try read.value(ofType: Int16.self) : Int16(try read.value(ofType: Int8.self))
+        offsetY = flag.argsAreWords ? try read.value(ofType: Int16.self) : Int16(try read.value(ofType: Int8.self))
         
         var transformIHat: CGPoint = LinearTransform.defaultIHat
         var transformJHat: CGPoint = LinearTransform.defaultJHat
         
         if flag.weHaveAScale {
-            let scale = read.valueF2Dot14()
+            let scale = try read.valueF2Dot14()
             
             transformIHat = .init(x: scale, y: transformIHat.y)
             transformJHat = .init(x: transformJHat.x, y: scale)
             
         } else if flag.weHaveAnXAndYScale {
-            let ixScale = read.valueF2Dot14()
-            let jyScale = read.valueF2Dot14()
+            let ixScale = try read.valueF2Dot14()
+            let jyScale = try read.valueF2Dot14()
             
             transformIHat = .init(x: ixScale, y: transformIHat.y)
             transformJHat = .init(x: transformJHat.x, y: jyScale)
             
         } else if flag.weHaveATwoByTwo {
-            let ixHat = read.valueF2Dot14()
-            let iyHat =  read.valueF2Dot14()
-            let jxHat = read.valueF2Dot14()
-            let jyHat =  read.valueF2Dot14()
+            let ixHat = try read.valueF2Dot14()
+            let iyHat = try  read.valueF2Dot14()
+            let jxHat = try read.valueF2Dot14()
+            let jyHat = try  read.valueF2Dot14()
             
             transformIHat = .init(x: ixHat, y: iyHat)
             transformJHat = .init(x: jxHat, y: jyHat)
         }
-
+        
         transformMatrix = .init(transformIHat, transformJHat, withOffset: .init(x: Double(offsetX), y: Double(offsetY)))
         
         tableLength = read.index
@@ -106,16 +106,16 @@ public struct CompoundGlyphTable: Identifiable, Equatable {
     init(_ bytes: Data) throws {
         let read: ReadHead = ReadHead(bytes, index: 0)
         
-        numberOfContours = read.value(ofType: Int16.self)!
+        numberOfContours = try read.value(ofType: Int16.self)
         
         guard numberOfContours < 0 else {
             throw GlyphValidationError("Expected Compound Glyph Data but received a Simple Glyph insted")
         }
         
-        xMin = read.value(ofType: UInt16.self)!
-        yMin = read.value(ofType: UInt16.self)!
-        xMax = read.value(ofType: UInt16.self)!
-        yMax = read.value(ofType: UInt16.self)!
+        xMin = try read.value(ofType: UInt16.self)
+        yMin = try read.value(ofType: UInt16.self)
+        xMax = try read.value(ofType: UInt16.self)
+        yMax = try read.value(ofType: UInt16.self)
         do {
             var glyphList: [CompoundGlyphItem] = []
             var haveMoreFlags = true
