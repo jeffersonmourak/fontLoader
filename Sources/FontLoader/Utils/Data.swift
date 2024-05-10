@@ -11,7 +11,7 @@ public typealias shortFrac = Int16
 public typealias Fixed = Int16
 public typealias FWord = Int16
 public typealias uFWord = UInt16
-public typealias F2Dot14 = Int16
+public typealias F2Dot14 = UInt16
 public typealias longDateTime = Int64
 
 public func byteToString(_ data: UInt32, withSize size: Int) -> String {
@@ -51,6 +51,9 @@ extension UInt16 {
     }
 }
 
+enum FontBinaryType {
+    case F2Dot14
+}
 
 extension Data {
     subscript<T: BinaryInteger>(at offset: Int, convertEndian convertEndian: Bool = false) -> T? {
@@ -68,5 +71,13 @@ extension Data {
         } else {
             return bytes.reduce(0) { T($0) << 8 + T($1) }
         }
+    }
+    
+    func valueF2Dot14(at offset: Int, convertEndia: Bool = false, convertEndian: Bool = false) -> Double {
+        let usignedValue = self.value(ofType: UInt16.self, at: offset)!
+        
+        let dividend = Double((1<<14))
+        
+        return Double(usignedValue) / dividend
     }
 }

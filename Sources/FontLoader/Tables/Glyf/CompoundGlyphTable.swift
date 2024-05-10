@@ -43,8 +43,7 @@ public struct CompoundGlyphItem {
     public let glyphIndex: UInt16
     public let offsetX: Int16
     public let offsetY: Int16
-    public var scaleX: UInt16
-    public var scaleY: UInt16
+    public let transformMatrix: LinearTransform
     
     let tableLength: Int
     
@@ -60,20 +59,34 @@ public struct CompoundGlyphItem {
         
         offsetX = flag.argsAreWords ? read.value(ofType: Int16.self)! : Int16(read.value(ofType: Int8.self)!)
         offsetY = flag.argsAreWords ? read.value(ofType: Int16.self)! : Int16(read.value(ofType: Int8.self)!)
-        var scaleX: UInt16 = 1
-        var scaleY: UInt16 = 1
+        
+        var transformIHat: CGPoint = LinearTransform.defaultIHat
+        var transformJHat: CGPoint = LinearTransform.defaultJHat
         
         if flag.weHaveAScale {
-            scaleX = read.value(ofType: UInt16.self)!
+            let scale = read.valueF2Dot14()
+            
+            transformIHat = .init(x: scale, y: transformIHat.y)
+            transformJHat = .init(x: transformJHat.x, y: scale)
+            
         } else if flag.weHaveAnXAndYScale {
-            scaleX = read.value(ofType: UInt16.self)!
-            scaleY = read.value(ofType: UInt16.self)!
+            let ixScale = read.valueF2Dot14()
+            let jyScale = read.valueF2Dot14()
+            
+            transformIHat = .init(x: ixScale, y: transformIHat.y)
+            transformJHat = .init(x: transformJHat.x, y: jyScale)
+            
         } else if flag.weHaveATwoByTwo {
-            throw FontValidationError(" 2x2 fonts")
+            let ixHat = read.valueF2Dot14()
+            let iyHat =  read.valueF2Dot14()
+            let jxHat = read.valueF2Dot14()
+            let jyHat =  read.valueF2Dot14()
+            
+            transformIHat = .init(x: ixHat, y: iyHat)
+            transformJHat = .init(x: jxHat, y: jyHat)
         }
-        
-        self.scaleX = scaleX
-        self.scaleY = scaleY
+
+        transformMatrix = .init(transformIHat, transformJHat, withOffset: .init(x: Double(offsetX), y: Double(offsetY)))
         
         tableLength = read.index
     }

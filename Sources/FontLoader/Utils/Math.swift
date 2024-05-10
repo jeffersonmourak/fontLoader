@@ -9,13 +9,14 @@ import Foundation
 
 public typealias FontMathNumericType = Numeric & Comparable & BinaryInteger
 
-public struct Vector2<T: FontMathNumericType> {
-    public let a: T
-    public let b: T
+public struct Vector2<T: FontMathNumericType>: CustomStringConvertible {
+    
+    public let x: T
+    public let y: T
     
     init(a: T, b: T) {
-        self.a = a
-        self.b = b
+        self.x = a
+        self.y = b
     }
     
     init(_ a: T, _ b: T) {
@@ -34,39 +35,45 @@ public struct Vector2<T: FontMathNumericType> {
         self.init(a: width, b: height)
     }
     
-    public var x: T {
+    public var description: String {
         get {
-            return a
+            return "(x: \(self.x), y: \(self.y))"
         }
     }
     
-    public var y: T {
+    public var a: T {
         get {
-            return b
+            return x
+        }
+    }
+    
+    public var b: T {
+        get {
+            return y
         }
     }
     
     public var w: T {
         get {
-            return a
+            return x
         }
     }
     
     public var h: T {
         get {
-            return b
+            return y
         }
     }
     
     public var width: T {
         get {
-            return a
+            return x
         }
     }
     
     public var height: T {
         get {
-            return b
+            return y
         }
     }
     
@@ -75,7 +82,7 @@ public struct Vector2<T: FontMathNumericType> {
     }
     
     public func toCGPoint() -> CGPoint {
-        return .init(x: Double(a), y: Double(b))
+        return .init(x: Double(x), y: Double(y))
     }
 }
 
@@ -128,5 +135,39 @@ public struct Area<T: FontMathNumericType> {
             min: .init(x: minX, y: minY),
             max: .init(x: maxX, y: maxY)
         )
+    }
+}
+
+
+public struct LinearTransform {
+    let iHat: CGPoint
+    let jHat: CGPoint
+    let offset: CGPoint
+    
+    init(_ iHat: CGPoint, _ jHat: CGPoint, withOffset offset: CGPoint = .init(x: 0, y: 0)) {
+        self.iHat = iHat
+        self.jHat = jHat
+        self.offset = offset
+    }
+    
+    public func transform(point: CGPoint) -> CGPoint {
+        let x = iHat.x * point.x + jHat.x * point.y + offset.x
+        let y = iHat.y * point.x + jHat.y * point.y + offset.y
+        
+        return .init(x: x, y: y)
+    }
+    
+    public static var defaultIHat: CGPoint {
+        return .init(x: 1, y: 0)
+    }
+    
+    public static var defaultJHat: CGPoint {
+        return .init(x: 0, y: 1)
+    }
+    
+    public static var zero: Self  {
+        get {
+            return .init(defaultIHat, defaultJHat)
+        }
     }
 }

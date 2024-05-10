@@ -33,6 +33,20 @@ class ReadHead: ReadHeadProtocol {
         return byteValue
     }
     
+    func valueF2Dot14(at offset: Int, convertEndian: Bool = false, advanceWhenRead: Bool = true) -> Double {
+        let byteValue = bytes.valueF2Dot14(at: offset, convertEndian: convertEndian)
+        
+        if (advanceWhenRead) {
+            self.advance(by: MemoryLayout<UInt16>.size)
+        }
+        
+        return byteValue
+    }
+    
+    func valueF2Dot14(convertEndian: Bool = false, advanceWhenRead: Bool = true) -> Double {
+        return self.valueF2Dot14(at: self.index, convertEndian: convertEndian, advanceWhenRead: advanceWhenRead)
+    }
+    
     func value<T: BinaryInteger>(ofType: T.Type, convertEndian: Bool = false, advanceWhenRead: Bool = true) -> T? {
         return self.value(ofType: ofType, at: self.index, convertEndian: convertEndian, advanceWhenRead: advanceWhenRead)
     }
