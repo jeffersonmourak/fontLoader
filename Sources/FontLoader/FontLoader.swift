@@ -55,6 +55,9 @@ public class FontLoader: FontWithRequiredTables {
     public var fontInfo: HeadTable
     public var memoryInfo: MaxpTable
     
+//  TODO: Turn this private
+    public var cachedGlyphs: [Int: SimpleGlyphTable] = [:]
+    
     public init(withData data: Data) throws {
         self.data = data
         let subTable = try Subtable(bytes: data)
@@ -96,29 +99,39 @@ public class FontLoader: FontWithRequiredTables {
         }
     }
     
-    public func getGlyphTableOrMissing(at index: Int) throws -> (Int, GlyfTable) {
+    private func getGlyphTableOrMissing(at index: Int) throws -> (Int, GlyfTable) {
         let targetIndex = Int(glyf.offset) + Int(glyphLocations[index])
         let bytes = data.advanced(by: Int(glyf.offset))
         
-        guard let glyphData = try? GlyfTable(data.advanced(by: targetIndex)) else {
+        if cachedGlyphs[index] != nil {
+            return (index, .simple(cachedGlyphs[index]!))
+        }
+        
+        guard let resolvedTable = try? GlyfTable(data.advanced(by: targetIndex)) else {
             return (0, try! GlyfTable(bytes))
         }
         
-        return (index, glyphData)
+        return (index, resolvedTable)
     }
     
     public func getGlyphContours(at index: Int) throws -> Glyph {
         let bytes = data.advanced(by: Int(glyf.offset))
-        let fontBoundaries = (CGPoint(x: Double(fontInfo.xMin), y: Double(fontInfo.yMin)), (CGPoint(x: Double(fontInfo.xMax), y: Double(fontInfo.yMax))))
+        let fontBoundaries = (CGPoint(x: Double(fontInfo.xMin), y: Double(fontInfo.yMin)), ())
         
-        let (resolvedIndex, glyphData) = try getGlyphTableOrMissing(at: index)
+        let (resolvedIndex, table) = try getGlyphTableOrMissing(at: index)
         
-        let glyphLayout: GlyphLayout = .init(fontBoundaries: fontBoundaries, horizontalMetrics: horizontalMetrics.hMetrics[resolvedIndex])
+//        let layout: GlyphLayout = .init(fontBoundaries: fontBoundaries, horizontalMetrics: horizontalMetrics.hMetrics[resolvedIndex])
 
-        return Glyph(glyphData, using: bytes, withLocation: glyphLocations, layout: glyphLayout)
+        return Glyph(from: table,
+                     at: index,
+                     maxPoints: CGPoint(x: Double(fontInfo.xMax), y: Double(fontInfo.yMax)),
+//                     withLayout: layout,
+                     glyfTable: bytes,
+                     glyphsLocations: glyphLocations,
+                     usingCache: &cachedGlyphs)
     }
     
-    func cmapLookup () throws -> [Character : CharacterMapItem] {
+    private func cmapLookup () throws -> [Character : CharacterMapItem] {
         let initialOffset = Int(self.cmap.offset)
         let bytes = data.advanced(by: initialOffset)
         let subTables = try CmapTable(bytes: bytes).subTables

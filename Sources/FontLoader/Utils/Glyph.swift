@@ -32,7 +32,7 @@ public struct GlyphArea {
     }
 }
 
-func buildGlyphPoints(from glyphs: [TransformedGlyph], layout: GlyphLayout) -> (GlyphArea, [[CGPoint]], Int){
+func buildGlyphPoints(from glyphs: [TransformedGlyph]) -> (GlyphArea, [[CGPoint]], Int){
     guard glyphs.count > 0 else {
         return (.zero, [], 0)
     }
@@ -120,20 +120,23 @@ public struct Glyph: Identifiable {
     public let id: UUID = UUID()
     private let bytes: Data
     private let locations: [Int]
-    public let fontLayout: GlyphLayout
+    public let maxPoints: CGPoint
     
     public let glyphBox: GlyphArea
     public let contours: [[CGPoint]]
     public let baseLineDistance: Int
     
-    init(_ glyph: GlyfTable, using bytes: Data, withLocation locations: [Int], layout: GlyphLayout) {
+    init(from glyph: GlyfTable, at index: Int, 
+         maxPoints: CGPoint,
+         glyfTable bytes: Data, glyphsLocations locations: [Int], usingCache cache: inout [Int : SimpleGlyphTable]) {
         self.bytes = bytes
         self.locations = locations
-        self.fontLayout = layout
+        self.maxPoints = maxPoints
         
         switch glyph {
             case let .simple(glyph):
-            (glyphBox, contours, baseLineDistance) = buildGlyphPoints(from: [(glyph, .zero)], layout: layout)
+            cache[index] = glyph
+            (glyphBox, contours, baseLineDistance) = buildGlyphPoints(from: [(glyph, .zero)])
             
             
             case let .compound(glyph):
@@ -148,14 +151,19 @@ public struct Glyph: Identifiable {
                     do {
                         let simpleGlyphData = try SimpleGlyphTable(glyphBytes)
                         
+                        cache[glyphIndex] = simpleGlyphData
+                        
                         glyphs.append((simpleGlyphData, currentGlyph.transformMatrix))
                     } catch {
-                        glyphs.append((try! SimpleGlyphTable(bytes), .zero))
+                        let unknownGlyph = try! SimpleGlyphTable(bytes)
+                        
+                        cache[glyphIndex] = unknownGlyph
+                        glyphs.append((unknownGlyph, .zero))
                     }
                 }
             
             
-                (glyphBox, contours, baseLineDistance) = buildGlyphPoints(from: glyphs, layout: layout)
+                (glyphBox, contours, baseLineDistance) = buildGlyphPoints(from: glyphs)
         }
     }
     
