@@ -54,6 +54,7 @@ public class FontLoader: FontWithRequiredTables {
     public var horizontalMetrics: HmtxTable
     public var fontInfo: HeadTable
     public var memoryInfo: MaxpTable
+    public let fontLayout: FontLayout
     
 //  TODO: Turn this private
     public var cachedGlyphs: [Int: SimpleGlyphTable] = [:]
@@ -75,6 +76,8 @@ public class FontLoader: FontWithRequiredTables {
             horizontalHeader = try HheaTable(bytes: data.advanced(by: Int(directory["hhea"]!.offset) + 2))
             horizontalMetrics =  try HmtxTable(bytes: data.advanced(by: Int(directory["hmtx"]!.offset)), numOfLongHorMetrics: Int(horizontalHeader.numOfLongHorMetrics), numOfGlyphs: Int(memoryInfo.numGlyphs))
             fontInfo = try HeadTable(bytes: data.advanced(by: Int(directory["head"]!.offset)))
+            fontLayout = .init(usingHeader: horizontalHeader, usingInfo: fontInfo)
+            
         } catch {
             throw error
         }
@@ -116,19 +119,21 @@ public class FontLoader: FontWithRequiredTables {
     
     public func getGlyphContours(at index: Int) throws -> Glyph {
         let bytes = data.advanced(by: Int(glyf.offset))
-        let fontBoundaries = (CGPoint(x: Double(fontInfo.xMin), y: Double(fontInfo.yMin)), ())
         
-        let (resolvedIndex, table) = try getGlyphTableOrMissing(at: index)
+        let (resolvedGlyphIndex, table) = try getGlyphTableOrMissing(at: index)
         
-//        let layout: GlyphLayout = .init(fontBoundaries: fontBoundaries, horizontalMetrics: horizontalMetrics.hMetrics[resolvedIndex])
+        let hMetrics = horizontalMetrics.hMetrics[resolvedGlyphIndex]
 
-        return Glyph(from: table,
-                     at: index,
-                     maxPoints: CGPoint(x: Double(fontInfo.xMax), y: Double(fontInfo.yMax)),
-//                     withLayout: layout,
-                     glyfTable: bytes,
-                     glyphsLocations: glyphLocations,
-                     usingCache: &cachedGlyphs)
+        return Glyph(
+            from: table,
+            at: index,
+            withLayout: fontLayout,
+            applyingMetrics: hMetrics,
+            maxPoints: CGPoint(x: Double(fontInfo.xMax), y: Double(fontInfo.yMax)),
+            glyfTable: bytes,
+            glyphsLocations: glyphLocations,
+            usingCache: &cachedGlyphs
+        )
     }
     
     private func cmapLookup () throws -> [Character : CharacterMapItem] {
