@@ -29,15 +29,19 @@ public struct GlyphPoint {
         self = cGPoint.toGlyphPoint(withFlag: flag)
     }
     
-    public func toCGPoint() -> CGPoint {
-        return .init(x: x, y: y)
+    public func cGPoint() -> CGPoint {
+        .init(x: x, y: y)
+    }
+    
+    public func cGFloatTuple() -> (CGFloat, CGFloat) {
+        (x, y)
     }
 }
 
 typealias TransformedGlyph = (SimpleGlyphTable, LinearTransform)
 
 func getGlyphMagntude(_ glyph: SimpleGlyphTable) -> (Int16, Int16) {
-    return (glyph.xMax - glyph.xMin, glyph.yMax - glyph.yMin)
+    (glyph.xMax - glyph.xMin, glyph.yMax - glyph.yMin)
 }
 
 public struct GlyphArea {
@@ -49,7 +53,7 @@ public struct GlyphArea {
     
     static var zero: Self {
         get {
-            return .init(xMin: 0, xMax: 0, yMin: 0, yMax: 0, baseline: 0)
+            .init(xMin: 0, xMax: 0, yMin: 0, yMax: 0, baseline: 0)
         }
     }
 }
