@@ -12,6 +12,28 @@ public struct GlyphLayout {
     public let baseline: CGFloat
 }
 
+public struct GlyphPoint {
+    public let x: CGFloat
+    public let y: CGFloat
+    public let flag: SimpleGlyphCoordinateFlag
+    public let isImplied: Bool
+    
+    public init(x: CGFloat, y: CGFloat, flag: SimpleGlyphCoordinateFlag, isImplied: Bool = false) {
+        self.x = x
+        self.y = y
+        self.flag = flag
+        self.isImplied = isImplied
+    }
+    
+    public init(_ cGPoint: CGPoint, flag: SimpleGlyphCoordinateFlag) {
+        self = cGPoint.toGlyphPoint(withFlag: flag)
+    }
+    
+    public func toCGPoint() -> CGPoint {
+        return .init(x: x, y: y)
+    }
+}
+
 typealias TransformedGlyph = (SimpleGlyphTable, LinearTransform)
 
 func getGlyphMagntude(_ glyph: SimpleGlyphTable) -> (Int16, Int16) {
@@ -32,12 +54,12 @@ public struct GlyphArea {
     }
 }
 
-func buildGlyphPoints(from glyphs: [TransformedGlyph], usingLayout layout: FontLayout, applyingMetrics metrics: LongHorMetric) -> (GlyphArea, [[CGPoint]]){
+func buildGlyphPoints(from glyphs: [TransformedGlyph], usingLayout layout: FontLayout, applyingMetrics metrics: LongHorMetric) -> (GlyphArea, [[GlyphPoint]]){
     guard glyphs.count > 0 else {
         return (.zero, [])
     }
 
-    var contoursList: [[CGPoint]] = []
+    var contoursList: [[GlyphPoint]] = []
     var baseLineDistance = 0
         
     var xMin: Double = Double.infinity
@@ -46,11 +68,11 @@ func buildGlyphPoints(from glyphs: [TransformedGlyph], usingLayout layout: FontL
     var yMax: Double = -Double.infinity
     
     for (glyph, transform) in glyphs {
-        
         var coords: [CGPoint] = []
         for i in 0..<glyph.xCoordinates.count {
             let x = glyph.xCoordinates[i]
             let y = glyph.yCoordinates[i]
+            
             
             if (y < baseLineDistance) {
                 baseLineDistance = y
@@ -80,17 +102,17 @@ func buildGlyphPoints(from glyphs: [TransformedGlyph], usingLayout layout: FontL
         var nextSegmentIndex = 0
         var beginOfContour: Int = 0
         
-        var contourPoints: [CGPoint] = [coords[0]]
-        
+        var contourPoints: [GlyphPoint] = [.init(coords[0], flag: SimpleGlyphCoordinateFlag(glyph.flags[0]))]
         
         for i in 1..<coords.count {
+            let flag = glyph.computed.expandedFlags[i]
             let current = coords[i]
             let nextSegment = nextSegmentIndex < glyph.endPtsOfContours.count ? glyph.endPtsOfContours[nextSegmentIndex] : glyph.endPtsOfContours.last!
             
-            contourPoints.append(current)
+            contourPoints.append(.init(current, flag: flag))
                     
             if (i == nextSegment) {
-                contourPoints.append(coords[beginOfContour])
+                contourPoints.append(.init(coords[beginOfContour], flag: flag))
                 contoursList.append(contourPoints)
                 contourPoints = []
                 beginOfContour = nextSegment + 1
@@ -101,19 +123,44 @@ func buildGlyphPoints(from glyphs: [TransformedGlyph], usingLayout layout: FontL
         contourPoints = []
     }
     
-    
-    
-    var normalizedContoursList: [[CGPoint]] = []
+    var normalizedContoursList: [[GlyphPoint]] = []
     
     for contour in contoursList {
-        var normalizedContour: [CGPoint] = []
+        var normalizedContour: [GlyphPoint] = []
+        var firstOnCurvePointIndex: Int = 0
         
-        for contourPoint in contour {
-            let newY = (layout.baseline - Double(layout.horizontalMetrics.descent)) - contourPoint.y
-            let newX = (contourPoint.x + Double(metrics.leftSideBearing))
-            normalizedContour.append(.init(x: newX, y: newY))
+        for i in 0..<contour.count {
+            if contour[i].flag.onCurve {
+                firstOnCurvePointIndex = i
+            }
         }
         
+        for i in 0..<contour.count {
+            let curr = contour[(i + firstOnCurvePointIndex + 0) % contour.count]
+            let next = contour[(i + firstOnCurvePointIndex + 1) % contour.count]
+            
+            
+            let newY = (layout.baseline - Double(layout.horizontalMetrics.descent)) - curr.y
+            let newX = (curr.x + Double(metrics.leftSideBearing))
+            normalizedContour.append(.init(x: newX, y: newY, flag: curr.flag))
+            
+            let isConsecutiveOffCurvePoints: Bool = !curr.flag.onCurve && !next.flag.onCurve
+            let isStraightLine: Bool = curr.flag.onCurve && next.flag.onCurve
+            
+            if isConsecutiveOffCurvePoints || isStraightLine {
+                let onCurve = isConsecutiveOffCurvePoints
+                
+                
+                let newY = (layout.baseline - Double(layout.horizontalMetrics.descent)) - ((curr.y + next.y) / 2)
+                let newX = (((curr.x + next.x) / 2) + Double(metrics.leftSideBearing))
+                
+                normalizedContour.append(.init(x: newX, y: newY, flag: curr.flag.cloneAndReplaceOnCurve(isOnCurve: onCurve), isImplied: true))
+            }
+            
+        }
+        
+        normalizedContour.append(normalizedContour[0])
+
         normalizedContoursList.append(normalizedContour)
     }
     
@@ -143,8 +190,8 @@ public struct Glyph: Identifiable {
     public let glyphBox: GlyphArea
     public let layout: FontLayout
     
-    public let contours: [[CGPoint]]
-    init(from glyph: GlyfTable, 
+    public let contours: [[GlyphPoint]]
+    init(from glyph: GlyfTable,
          at index: Int,
          withLayout layout: FontLayout,
          applyingMetrics metrics: LongHorMetric,
@@ -194,4 +241,11 @@ public struct Glyph: Identifiable {
     
     
     static public func getGlyphLayout() {}
+}
+
+
+extension CGPoint {
+    public func toGlyphPoint(withFlag flag: SimpleGlyphCoordinateFlag) -> GlyphPoint {
+        return .init(x: self.x, y: self.y, flag: flag)
+    }
 }

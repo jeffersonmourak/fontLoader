@@ -47,13 +47,13 @@ func readCoordinates(_ read: inout ReadHead, flags: [SimpleGlyphCoordinateFlag],
 }
 
 public struct SimpleGlyphCoordinateFlag {
-    let rawValue: UInt8
-    let onCurve: Bool
-    let xShort: Bool
-    let yShort: Bool
-    let repeating: Bool
-    let xInstruction: Bool
-    let yInstruction: Bool
+    public let rawValue: UInt8
+    public let onCurve: Bool
+    public let xShort: Bool
+    public let yShort: Bool
+    public let repeating: Bool
+    public let xInstruction: Bool
+    public let yInstruction: Bool
     
 //    let _reserved6: Bool
 //    let _reserved7: Bool
@@ -68,6 +68,20 @@ public struct SimpleGlyphCoordinateFlag {
 //        _reserved6 = byte.isBitSet(at: 6)
 //        _reserved7 = byte.isBitSet(at: 7)
         self.rawValue = byte
+    }
+    
+    init (rawValue: UInt8, onCurve: Bool, xShort: Bool, yShort: Bool, repeating: Bool, xInstruction: Bool, yInstruction: Bool) {
+        self.rawValue = rawValue
+        self.onCurve = onCurve
+        self.xShort = xShort
+        self.yShort = yShort
+        self.repeating = repeating
+        self.xInstruction = xInstruction
+        self.yInstruction = yInstruction
+    }
+    
+    public func cloneAndReplaceOnCurve(isOnCurve: Bool) -> Self {
+        .init(rawValue: rawValue, onCurve: isOnCurve, xShort: xShort, yShort: yShort, repeating: repeating, xInstruction: xInstruction, yInstruction: yInstruction)
     }
 }
 
