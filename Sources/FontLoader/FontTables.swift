@@ -9,6 +9,38 @@ import Foundation
 
 public typealias FontTableDirectoryMap = [String: TableDirectory]
 
+public enum FontPlatforms: UInt16 {
+    case Unicode = 0
+    case Macintosh = 1
+    case RESERVED = 2
+    case Microsoft = 3
+    
+    static func from<T: BinaryInteger>(_ value: T) -> FontPlatforms {
+        let int16value = UInt16(value)
+        
+        switch (int16value) {
+        case 0: return .Unicode
+        case 1: return .Macintosh
+        case 2: return .RESERVED
+        case 3: return .Microsoft
+        default: return .Unicode
+        }
+    }
+    
+    public func toString() -> String {
+        switch self {
+        case .Unicode:
+            return "Unicode"
+        case .Macintosh:
+            return "Macintosh"
+        case .Microsoft:
+            return "Microsoft"
+        case .RESERVED:
+            return "RESERVED"
+        }
+    }
+}
+
 public struct Subtable {
     let scalerType: UInt32
     let numTables: UInt16

@@ -85,7 +85,6 @@ public class FontLoader: FontWithRequiredTables {
         super.init(subTable: subTable, directory: directory)
         
         characters = try cmapLookup()
-        
     }
 
     public var glyphLocations: [Int] {
@@ -169,5 +168,9 @@ public class FontLoader: FontWithRequiredTables {
         }
         
         return [:]
+    }
+    
+    public func getFontNameTable() throws -> NameTable {
+        return try NameTable(bytes: data.advanced(by: Int(name.offset)))
     }
 }

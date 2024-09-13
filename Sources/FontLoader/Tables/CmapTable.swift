@@ -7,32 +7,15 @@
 
 import Foundation
 
-enum CmapPlatforms: UInt16 {
-    case Unicode = 0
-    case Macintosh = 1
-    case RESERVED = 2
-    case Microsoft = 3
-    
-    static func from<T: BinaryInteger>(_ value: T) -> CmapPlatforms {
-        let int16value = UInt16(value)
-        
-        switch (int16value) {
-        case 0: return .Unicode
-        case 1: return .Macintosh
-        case 2: return .RESERVED
-        case 3: return .Microsoft
-        default: return .Unicode
-        }
-    }
-}
+
 
 public struct CmapPlatformTable {
-    let platformId: CmapPlatforms
+    let platformId: FontPlatforms
     let platformSpecificID: UInt16
     let offset: UInt32
     
     init(platformId: UInt16, platformSpecificID: UInt16, offset: UInt32) {
-        self.platformId = CmapPlatforms.from(platformId)
+        self.platformId = FontPlatforms.from(platformId)
         self.platformSpecificID = platformSpecificID
         self.offset = offset
     }
@@ -140,7 +123,7 @@ public struct CmapTableFormat4 {
         
         var groups : [CmapTableGroup] = []
         
-        for var i in 0..<startCodes.count {
+        for i in 0..<startCodes.count {
             let endCode = endCodes[i]
             var currCode = startCodes[i]
             
@@ -178,12 +161,10 @@ public struct CmapTableFormat4 {
     func toCharacterMap() -> [Character: CharacterMapItem] {
         var mappedGroups: [Character: CharacterMapItem] = [:]
         
-         groups.map {
-            let char = Character(UnicodeScalar($0.charCode)!)
+        for group in groups {
+            let char = Character(UnicodeScalar(group.charCode)!)
             
-             mappedGroups[char] = CharacterMapItem(char:char, charCode: Int($0.charCode), glyphIndex: Int($0.glyphIndex))
-            
-            return
+             mappedGroups[char] = CharacterMapItem(char:char, charCode: Int(group.charCode), glyphIndex: Int(group.glyphIndex))
         }
         
         return mappedGroups
@@ -224,10 +205,9 @@ public struct CmapTableFormat12 {
                 let glyphIndex = startGlyphIndex + charCodeOffset
                 let charCode = startCharCode + charCodeOffset
                 
-                if let scalar = UnicodeScalar(charCode) {
+                if UnicodeScalar(charCode) != nil {
                     groups.append(.init(charCode: Int(charCode), glyphIndex: Int(glyphIndex)))
                 }
-                
                 
                 includeMissingCharGlyph = includeMissingCharGlyph || glyphIndex == 0
             }
@@ -242,12 +222,9 @@ public struct CmapTableFormat12 {
         
         var mappedGroups: [Character: CharacterMapItem] = [:]
         
-         groups.map {
-            let char = Character(UnicodeScalar($0.charCode)!)
-            
-             mappedGroups[char] = CharacterMapItem(char:char, charCode: Int($0.charCode), glyphIndex: Int($0.glyphIndex))
-            
-            return
+        for group in groups {
+            let char = Character(UnicodeScalar(group.charCode)!)
+            mappedGroups[char] = CharacterMapItem(char:char, charCode: Int(group.charCode), glyphIndex: Int(group.glyphIndex))
         }
         
         return mappedGroups

@@ -190,9 +190,9 @@ public struct Glyph: Identifiable {
     private let bytes: Data
     private let locations: [Int]
     public let maxPoints: CGPoint
-    
     public let glyphBox: GlyphArea
     public let layout: FontLayout
+    public let index: Int
     
     public let contours: [[GlyphPoint]]
     init(from glyph: GlyfTable,
@@ -208,12 +208,13 @@ public struct Glyph: Identifiable {
         self.locations = locations
         self.maxPoints = maxPoints
         self.layout = layout
+
+        self.index = index
         
         switch glyph {
             case let .simple(glyph):
             cache[index] = glyph
             (glyphBox, contours) = buildGlyphPoints(from: [(glyph, .zero)], usingLayout: layout, applyingMetrics: metrics)
-            
             
             case let .compound(glyph):
                 var glyphs: [TransformedGlyph] = []
