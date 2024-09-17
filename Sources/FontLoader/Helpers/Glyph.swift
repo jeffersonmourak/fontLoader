@@ -193,10 +193,12 @@ public struct Glyph: Identifiable {
     public let glyphBox: GlyphArea
     public let layout: FontLayout
     public let index: Int
+    public let name: String
     
     public let contours: [[GlyphPoint]]
     init(from glyph: GlyfTable,
          at index: Int,
+         name: String,
          withLayout layout: FontLayout,
          applyingMetrics metrics: LongHorMetric,
          maxPoints: CGPoint,
@@ -208,6 +210,7 @@ public struct Glyph: Identifiable {
         self.locations = locations
         self.maxPoints = maxPoints
         self.layout = layout
+        self.name = name
 
         self.index = index
         

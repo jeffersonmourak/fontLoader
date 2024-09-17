@@ -16,12 +16,25 @@ public typealias longDateTime = Int64
 
 public enum DataError: Error {
     case ParseError
+
+    var localizedDescription: String {
+        switch self {
+        case .ParseError:
+            return "Error parsing data"
+        }
+    }
 }
 
 public func byteToString(_ data: UInt32, withSize size: Int) -> String {
-    var string = data
+    var string: UInt32 = data
+
+    let bytes: [UInt8] = withUnsafePointer(to: &string) {
+        $0.withMemoryRebound(to: UInt8.self, capacity: size) {
+            Array(UnsafeBufferPointer(start: $0, count: size))
+        }
+    }
     
-    return NSString(bytes: &string, length: size, encoding: NSUTF8StringEncoding)! as String
+    return String(bytes: bytes, encoding: .utf8) ?? ""
 }
 
 public func byteToArray<T: BinaryInteger>(_ bytes: Data, ofType: T.Type, length: Int) throws -> ([T], Int) {

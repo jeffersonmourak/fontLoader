@@ -22,7 +22,7 @@ fileprivate func loadTableDir(fromData data: Data, usingSubtable subTable: Subta
     for _ in 0..<subTable.numTables {
         dirOffset.next()
         
-        let table = try TableDirectory(bytes: dataWindow)
+        let table: TableDirectory = try TableDirectory(bytes: dataWindow)
         
         if missingRequiredTables.contains(table.tag) {
             missingRequiredTables.remove(table.tag)
@@ -45,6 +45,15 @@ fileprivate func handleInvalid(reason: String) {
     print("Invalid font. Reason: \(reason)")
 }
 
+ fileprivate func computeGlyphLocations(bytes: Data, fontInfo: HeadTable, memoryInfo: MaxpTable) throws -> [Int] {
+    if (fontInfo.indexToLocFormat == 1) {
+        return try LocaTable<UInt32>(bytes: bytes, withSize: Int(memoryInfo.numGlyphs)).indexes.map { Int($0) }
+    } else {
+        return try LocaTable<UInt16>(bytes: bytes, withSize: Int(memoryInfo.numGlyphs)).indexes.map { Int($0) * 2 }
+    }
+}
+    
+
 public class FontLoader: FontWithRequiredTables {
     private let data: Data
     
@@ -55,13 +64,15 @@ public class FontLoader: FontWithRequiredTables {
     public var fontInfo: HeadTable
     public var memoryInfo: MaxpTable
     public let fontLayout: FontLayout
+    public let postScriptInfo: PostTable
+    public let glyphLocations: [Int]
     
 //  TODO: Turn this private
     public var cachedGlyphs: [Int: SimpleGlyphTable] = [:]
     
     public init(withData data: Data) throws {
         self.data = data
-        let subTable = try Subtable(bytes: data)
+        let subTable: Subtable = try Subtable(bytes: data)
         
         var directory: FontTableDirectoryMap = [:]
         
@@ -76,8 +87,9 @@ public class FontLoader: FontWithRequiredTables {
             horizontalHeader = try HheaTable(bytes: data.advanced(by: Int(directory["hhea"]!.offset) + 2))
             horizontalMetrics =  try HmtxTable(bytes: data.advanced(by: Int(directory["hmtx"]!.offset)), numOfLongHorMetrics: Int(horizontalHeader.numOfLongHorMetrics), numOfGlyphs: Int(memoryInfo.numGlyphs))
             fontInfo = try HeadTable(bytes: data.advanced(by: Int(directory["head"]!.offset)))
-            fontLayout = .init(usingHeader: horizontalHeader, usingInfo: fontInfo)
-            
+            fontLayout = FontLayout(usingHeader: horizontalHeader, usingInfo: fontInfo)
+            postScriptInfo = try PostTable(bytes: data.advanced(by: Int(directory["post"]!.offset)))
+            glyphLocations = try computeGlyphLocations(bytes: data.advanced(by: Int(directory["loca"]!.offset)), fontInfo: fontInfo, memoryInfo: memoryInfo)
         } catch {
             throw error
         }
@@ -87,29 +99,16 @@ public class FontLoader: FontWithRequiredTables {
         characters = try cmapLookup()
     }
 
-    public var glyphLocations: [Int] {
-        get {
-            do {
-                if (fontInfo.indexToLocFormat == 1) {
-                    return try LocaTable<UInt32>(bytes: data.advanced(by: Int(loca.offset)), withSize: Int(memoryInfo.numGlyphs)).indexes.map { Int($0) }
-                } else {
-                   return try LocaTable<UInt16>(bytes: data.advanced(by: Int(loca.offset)), withSize: Int(memoryInfo.numGlyphs)).indexes.map { Int($0) * 2 }
-                }
-            } catch {
-                return []
-            }
-        }
-    }
-    
+   
     private func getGlyphTableOrMissing(at index: Int) throws -> (Int, GlyfTable) {
-        let targetIndex = Int(glyf.offset) + Int(glyphLocations[index])
-        let bytes = data.advanced(by: Int(glyf.offset))
+        let targetIndex: Int = Int(glyf.offset) + Int(glyphLocations[index])
+        let bytes: Data = data.advanced(by: Int(glyf.offset))
         
         if cachedGlyphs[index] != nil {
             return (index, .simple(cachedGlyphs[index]!))
         }
         
-        guard let resolvedTable = try? GlyfTable(data.advanced(by: targetIndex)) else {
+        guard let resolvedTable: GlyfTable = try? GlyfTable(data.advanced(by: targetIndex)) else {
             return (0, try! GlyfTable(bytes))
         }
         
@@ -117,15 +116,16 @@ public class FontLoader: FontWithRequiredTables {
     }
     
     public func getGlyphContours(at index: Int) throws -> Glyph {
-        let bytes = data.advanced(by: Int(glyf.offset))
+        let bytes: Data = data.advanced(by: Int(glyf.offset))
         
         let (resolvedGlyphIndex, table) = try getGlyphTableOrMissing(at: index)
         
-        let hMetrics = horizontalMetrics.hMetrics[resolvedGlyphIndex]
+        let hMetrics: LongHorMetric = horizontalMetrics.hMetrics[resolvedGlyphIndex]
 
         return Glyph(
             from: table,
             at: index,
+            name: postScriptInfo.names[index],
             withLayout: fontLayout,
             applyingMetrics: hMetrics,
             maxPoints: CGPoint(x: Double(fontInfo.xMax), y: Double(fontInfo.yMax)),
@@ -136,16 +136,16 @@ public class FontLoader: FontWithRequiredTables {
     }
     
     private func cmapLookup () throws -> [Character : CharacterMapItem] {
-        let initialOffset = Int(self.cmap.offset)
-        let bytes = data.advanced(by: initialOffset)
-        let subTables = try CmapTable(bytes: bytes).subTables
+        let initialOffset: Int = Int(self.cmap.offset)
+        let bytes: Data = data.advanced(by: initialOffset)
+        let subTables: [CmapPlatformTable] = try CmapTable(bytes: bytes).subTables
         
-        var cmapSubtableOffset = 0
-        var selectedUnicode = -1
+        var cmapSubtableOffset: Int = 0
+        var selectedUnicode: Int = -1
         
-        for subTable in subTables {
+        for subTable: CmapPlatformTable in subTables {
             if subTable.platformId == .Unicode {
-                let platformSpecificId = Int(subTable.platformSpecificID)
+                let platformSpecificId: Int = Int(subTable.platformSpecificID)
                 if platformSpecificId != 2 && platformSpecificId <= 4 && platformSpecificId > selectedUnicode {
                     cmapSubtableOffset = Int(subTable.offset)
                     selectedUnicode = platformSpecificId
@@ -157,7 +157,7 @@ public class FontLoader: FontWithRequiredTables {
             }
         }
         
-        let format = try bytes.value(ofType: UInt16.self, at: cmapSubtableOffset)
+        let format: UInt16 = try bytes.value(ofType: UInt16.self, at: cmapSubtableOffset)
                 
         if format == 4 {
             return try CmapTableFormat4(bytes: data, cmapStartOffset: initialOffset + cmapSubtableOffset).toCharacterMap()

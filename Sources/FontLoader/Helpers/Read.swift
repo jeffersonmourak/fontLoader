@@ -79,6 +79,21 @@ class ReadHead: ReadHeadProtocol {
     func values<T: BinaryInteger>(ofType: T.Type, withSize length: Int, convertEndian: Bool = false, advanceWhenRead: Bool = true) throws -> [T] {
         return try values(ofType: ofType, at: index, withSize: length, convertEndian: convertEndian, advanceWhenRead: advanceWhenRead)
     }
+
+    func string(length: Int) throws -> String {
+        let string = try bytes.string(at: index, length: length)
+        
+        self.advance(by: length)
+        
+        return string
+    }
+
+    func pascalString() throws -> String {
+        let length: Int = Int(try self.value(ofType: UInt8.self))
+        let string: String = try self.string(length: length)
+        
+        return string
+    }
     
     func advance(by sumOffset: Int) {
         self.index += sumOffset;
@@ -115,5 +130,11 @@ struct ReadOffset {
     
     func previous() {
         self.readHead.recue(by: blockSize)
+    }
+}
+
+extension Data {
+    public func string(at offset: Int, length: Int) throws -> String {
+        return String(bytes: self[offset ..< offset + length], encoding: .utf8) ?? ""
     }
 }

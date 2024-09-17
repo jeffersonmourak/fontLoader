@@ -39,7 +39,7 @@ public struct NameTable {
     
     public var records: [NameRecord] = []
     
-    let tableLength: Int
+    let tableLength: Int 
     
     init(bytes: Data) throws {
         let read: ReadHead = ReadHead(bytes, index: 0)
