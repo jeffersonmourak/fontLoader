@@ -114,6 +114,8 @@ public class FontLoader: FontWithRequiredTables {
         
         return (index, resolvedTable)
     }
+
+    public func getSpaceGlyphIndex() -> Int { postScriptInfo.names.firstIndex { $0 == "SPC"} ?? 0 }
     
     public func getGlyphContours(at index: Int) throws -> Glyph {
         let bytes: Data = data.advanced(by: Int(glyf.offset))
