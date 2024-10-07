@@ -145,8 +145,8 @@ func buildGlyphPoints(
 
             let isConsecutiveOffCurvePoints: Bool = !curr.flag.onCurve && !next.flag.onCurve
             let isStraightLine: Bool = curr.flag.onCurve && next.flag.onCurve
-
-            if isConsecutiveOffCurvePoints || isStraightLine {
+            // TODO: Figure out exactly why skip the second last solves this!
+            if i != contour.count - 2 && (isConsecutiveOffCurvePoints || isStraightLine) {
                 let onCurve = isConsecutiveOffCurvePoints
 
                 let newY =
