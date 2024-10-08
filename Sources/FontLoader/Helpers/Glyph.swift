@@ -43,33 +43,15 @@ func getGlyphMagntude(_ glyph: SimpleGlyphTable) -> (Int16, Int16) {
     (glyph.xMax - glyph.xMin, glyph.yMax - glyph.yMin)
 }
 
-public struct GlyphArea {
-    public let xMin: Double
-    public let xMax: Double
-    public let yMin: Double
-    public let yMax: Double
-    public let baseline: Double
-
-    static var zero: Self {
-        .init(xMin: 0, xMax: 0, yMin: 0, yMax: 0, baseline: 0)
-    }
-}
-
 func buildGlyphPoints(
     from glyphs: [TransformedGlyph], usingLayout layout: FontLayout,
     applyingMetrics metrics: LongHorMetric
-) -> (GlyphArea, [[GlyphPoint]]) {
+) -> [[GlyphPoint]] {
     guard glyphs.count > 0 else {
-        return (.zero, [])
+        return []
     }
 
     var contoursList: [[GlyphPoint]] = []
-    var baseLineDistance = 0
-
-    var xMin: Double = Double.infinity
-    var xMax: Double = -Double.infinity
-    var yMin: Double = Double.infinity
-    var yMax: Double = -Double.infinity
 
     for (glyph, transform) in glyphs {
         var coords: [CGPoint] = []
@@ -77,29 +59,9 @@ func buildGlyphPoints(
             let x = glyph.xCoordinates[i]
             let y = glyph.yCoordinates[i]
 
-            if y < baseLineDistance {
-                baseLineDistance = y
-            }
-
             let point = transform.transform(point: Point(x, y).toCGPoint())
 
-            if point.x < xMin {
-                xMin = point.x
-            }
-
-            if point.x > xMax {
-                xMax = point.x
-            }
-
-            if point.y < yMin {
-                yMin = point.y
-            }
-
-            if point.y > yMax {
-                yMax = point.y
-            }
-
-            coords.append(point)
+            coords.append(layout.normalizePoint(point))
         }
 
         var nextSegmentIndex = 0
@@ -139,7 +101,7 @@ func buildGlyphPoints(
             let curr = contour[(contour.count + i + 0) % contour.count]
             let next = contour[(contour.count + i + 1) % contour.count]
 
-            let newY = (layout.baseline - Double(layout.horizontalMetrics.descent)) - curr.y
+            let newY = layout.baseline - curr.y
             let newX = curr.x + Double(metrics.leftSideBearing)
             normalizedContour.append(.init(x: newX, y: newY, flag: curr.flag))
 
@@ -149,9 +111,7 @@ func buildGlyphPoints(
             if i != contour.count - 2 && (isConsecutiveOffCurvePoints || isStraightLine) {
                 let onCurve = isConsecutiveOffCurvePoints
 
-                let newY =
-                    (layout.baseline - Double(layout.horizontalMetrics.descent))
-                    - ((curr.y + next.y) / 2)
+                let newY = layout.baseline - ((curr.y + next.y) / 2)
                 let newX = ((curr.x + next.x) / 2) + Double(metrics.leftSideBearing)
                 normalizedContour.append(
                     .init(
@@ -164,17 +124,7 @@ func buildGlyphPoints(
         normalizedContoursList.append(normalizedContour)
     }
 
-    let glyphBaseline = layout.height - yMin - Double(baseLineDistance)
-
-    yMax = glyphBaseline + Double(baseLineDistance)
-    yMin = yMin + Double(baseLineDistance)
-
-    xMax = xMax + Double(metrics.leftSideBearing)
-
-    return (
-        .init(xMin: xMin, xMax: xMax, yMin: yMin, yMax: yMax, baseline: glyphBaseline),
-        normalizedContoursList
-    )
+    return normalizedContoursList
 }
 
 public struct GlyphContour {
@@ -188,7 +138,6 @@ public struct Glyph: Identifiable {
     private let bytes: Data
     private let locations: [Int]
     public let maxPoints: CGPoint
-    public let glyphBox: GlyphArea
     public let layout: FontLayout
     public let index: Int
     public let name: String
@@ -216,7 +165,7 @@ public struct Glyph: Identifiable {
         switch glyph {
         case let .simple(glyph):
             cache[index] = glyph
-            (glyphBox, contours) = buildGlyphPoints(
+            contours = buildGlyphPoints(
                 from: [(glyph, .zero)], usingLayout: layout, applyingMetrics: metrics)
 
         case let .compound(glyph):
@@ -242,7 +191,7 @@ public struct Glyph: Identifiable {
                 }
             }
 
-            (glyphBox, contours) = buildGlyphPoints(
+            contours = buildGlyphPoints(
                 from: glyphs, usingLayout: layout, applyingMetrics: metrics)
         }
     }
