@@ -102,7 +102,7 @@ func buildGlyphPoints(
             let next = contour[(contour.count + i + 1) % contour.count]
 
             let newY = layout.baseline - curr.y
-            let newX = curr.x + Double(metrics.leftSideBearing)
+            let newX = curr.x
             normalizedContour.append(.init(x: newX, y: newY, flag: curr.flag))
 
             let isConsecutiveOffCurvePoints: Bool = !curr.flag.onCurve && !next.flag.onCurve
@@ -112,7 +112,7 @@ func buildGlyphPoints(
                 let onCurve = isConsecutiveOffCurvePoints
 
                 let newY = layout.baseline - ((curr.y + next.y) / 2)
-                let newX = ((curr.x + next.x) / 2) + Double(metrics.leftSideBearing)
+                let newX = ((curr.x + next.x) / 2)
                 normalizedContour.append(
                     .init(
                         x: newX, y: newY,
@@ -141,6 +141,7 @@ public struct Glyph: Identifiable {
     public let layout: FontLayout
     public let index: Int
     public let name: String
+    public let horizontalMetrics: LongHorMetric
 
     public let contours: [[GlyphPoint]]
     init(
@@ -159,6 +160,7 @@ public struct Glyph: Identifiable {
         self.maxPoints = maxPoints
         self.layout = layout
         self.name = name
+        self.horizontalMetrics = metrics
 
         self.index = index
 
